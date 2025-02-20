@@ -9,12 +9,12 @@
       </inertial>
       <visual>
         <geometry>
-          <mesh filename="package://urdf/obj_01.ply" scale="0.001 0.001 0.001"/>
+          <mesh filename="package://agimus_demo_05_pick_and_place/urdf/meshes/obj_23.ply" scale="0.001 0.001 0.001"/>
         </geometry>
       </visual>
       <collision>
         <geometry>
-          <mesh filename="package://urdf/obj_01.ply" scale="0.001 0.001 0.001"/>
+          <mesh filename="package://agimus_demo_05_pick_and_place/urdf/meshes/obj_23.ply" scale="0.001 0.001 0.001"/>
         </geometry>
       </collision>
     </link>
