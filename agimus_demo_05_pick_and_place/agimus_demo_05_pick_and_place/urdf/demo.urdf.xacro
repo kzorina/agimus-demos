@@ -1,12 +1,36 @@
 <?xml version='1.0' encoding='utf-8'?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="panda">
-  <xacro:include filename="/home/gepetto/ros2_ws/src/agimus-demos/agimus_demo_05_pick_and_place/agimus_demo_05_pick_and_place/urdf/franka_robot.xacro"/>
-  <xacro:include filename="/home/gepetto/ros2_ws/src/agimus-demos/agimus_demo_05_pick_and_place/agimus_demo_05_pick_and_place/urdf/support.urdf.xacro"/>
-
-  <xacro:support/>
-  <xacro:franka_robot arm_id="panda"
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="fer">
+ 
+  <xacro:include filename="$(find franka_description)/robots/fer/fer.urdf.xacro">
+    <xacro:arg name="with_sc" value="true"/>  </xacro:include>
+  <!-- <xacro:support/>
+  <xacro:franka_robot arm_id="fer"
                       joint_limits="${xacro.load_yaml('$(find franka_description)/robots/fer/joint_limits.yaml')}">
-  </xacro:franka_robot>
+  </xacro:franka_robot> -->
 
-  <!-- wall behind the table -->
+  <link name="support_link">
+    <inertial>
+      <mass value="200"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="50"  ixy="0"  ixz="0" iyy="50" iyz="0" izz="50" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -1.0"/>
+      <geometry>
+        <box size="1.38 0.85 0.88"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -1.0"/>
+      <geometry>
+        <box size="1.38 0.85 0.88"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="support_joint" type="fixed">
+    <origin xyz="0.385 0 -1.44" rpy="0 0 0" />
+    <parent link="base" />
+    <child  link="support_link" />
+  </joint>
 </robot>

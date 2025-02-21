@@ -167,14 +167,14 @@ class Orchestrator(object):
         self.hpp_client.robot.setCurrentConfig(hpp_q_init)
         # TODO: change from hardcoded robot name
         cam_in_world_pose = self.hpp_client.robot.getLinkPosition(
-            linkName="panda/camera_color_optical_frame"
+            linkName="fer/camera_color_optical_frame"
         )
         obj_in_world_pose = multiply_poses(cam_in_world_pose, obj_in_cam_pose)
         # TODO: make this better
         obj_in_world_pose[3:] = obj_in_world_pose[3:] / np.linalg.norm(
             obj_in_world_pose[3:]
         )
-        self.hpp_client.start_obj_pose = list(obj_in_world_pose)
+        # self.hpp_client.start_obj_pose = list(obj_in_world_pose)
         grasp_path, placing_path, freefly_path = self.hpp_client.plan(
             list(current_robot_state.position)
         )

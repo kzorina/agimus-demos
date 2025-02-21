@@ -53,11 +53,13 @@ class HPPInterface:
     def __init__(
         self,
         object_name: str = "obj_01",
+        robot_name: str = "fer",
         robot_urdf_string: str = "",
         robot_srdf_string: str = "",
-        start_obj_pose: list[float] = [0.0, 0.1, 0.9, 0.0, 0.0, 0.0, 1.0],
-        goal_obj_pose: list[float] = [0.0, -0.3, 1.0, 0.0, 0.0, 0.0, 1.0],
+        start_obj_pose: list[float] = [0.45, -0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
+        goal_obj_pose: list[float] = [0.45, 0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
     ):
+        self.robot_name = robot_name
         self.start_obj_pose = start_obj_pose
         self.goal_obj_pose = goal_obj_pose
 
@@ -70,6 +72,11 @@ class HPPInterface:
             if robot_urdf_string == ""
             else robot_urdf_string
         )
+        save_demo_urdf_path = str(package_location / "demo_parsed.urdf")
+        with open(save_demo_urdf_path, 'w') as file:
+            file.write(urdf_string)
+        print(f"String has been saved to {save_demo_urdf_path}")
+
         Robot.urdfString = urdf_string
         Robot.srdfString = robot_srdf_string
 
@@ -88,11 +95,11 @@ class HPPInterface:
         self.setup_problem()
 
     def set_robot(self):
-        self.robot = Robot("robot", "panda", rootJointType="anchor")
+        self.robot = Robot("robot", self.robot_name, rootJointType="anchor")
         # self.robot.opticalFrame = "camera_color_optical_frame"
         # TODO: get joint names automatically
         shrinkJointRange(
-            self.robot, [f"panda/panda_joint{i}" for i in range(1, 8)], 0.95
+            self.robot, [f"fer/fer_joint{i}" for i in range(1, 8)], 0.95
         )
 
     def set_problem(self):
@@ -123,23 +130,23 @@ class HPPInterface:
         print("Part and box loaded")
         # TODO: think about this, maybe as a parameter
         self.robot.client.manipulation.robot.insertRobotSRDFModel(
-            "panda",
+            self.robot_name,
             str(Path(__file__).parent / "srdf/demo.srdf"),
         )
         # Remove collisions between object and self collision geometries
         # TODO: get link names automatically
         srdfString = '<robot name="demo">'
         for i in range(1, 8):
-            srdfString += f'<disable_collisions link1="panda_link{i}_sc" link2="{self.manip_object.name}/base_link" reason="handled otherwise"/>'
-        srdfString += f'<disable_collisions link1="panda_hand_sc" link2="{self.manip_object.name}/base_link" reason="handled otherwise"/>'
+            srdfString += f'<disable_collisions link1="fer_link{i}_sc" link2="{self.manip_object.name}/base_link" reason="handled otherwise"/>'
+        srdfString += f'<disable_collisions link1="fer_hand_sc" link2="{self.manip_object.name}/base_link" reason="handled otherwise"/>'
         srdfString += "</robot>"
         self.robot.client.manipulation.robot.insertRobotSRDFModelFromString(
-            "panda", srdfString
+            self.robot_name, srdfString
         )
 
         # Create robot gripper handle, x-axis is facing down (for pregrasp)
         self.ps.client.manipulation.robot.addGripper(
-            "panda/support_link",
+            f"{self.robot_name}/support_link",
             "goal/gripper",
             self.goal_obj_pose[:3] + [0, sqrt(2) / 2, 0, sqrt(2) / 2],
             0.0,
@@ -148,10 +155,10 @@ class HPPInterface:
         # Lock gripper in open position.
         # TODO: pass this as a parameter?
         self.ps.createLockedJoint(
-            "locked_finger_1", "panda/panda_finger_joint1", [0.035]
+            "locked_finger_1", f"{self.robot_name}/fer_finger_joint1", [0.035]
         )
         self.ps.createLockedJoint(
-            "locked_finger_2", "panda/panda_finger_joint2", [0.035]
+            "locked_finger_2", f"{self.robot_name}/fer_finger_joint2", [0.035]
         )
         self.ps.setConstantRightHandSide("locked_finger_1", True)
         self.ps.setConstantRightHandSide("locked_finger_2", True)
@@ -178,7 +185,7 @@ class HPPInterface:
 
         self.binPicking = BinPicking(self.ps)
         self.binPicking.objects = [self.manip_object.name, self.obstacle_object.name]
-        self.binPicking.robotGrippers = ["panda/panda_gripper"]
+        self.binPicking.robotGrippers = [f"{self.robot_name}/fer_gripper"]
         self.binPicking.goalGrippers = ["goal/gripper"]
         self.binPicking.goalHandles = self.goal_handles
         self.binPicking.handles = self.handles
@@ -226,6 +233,7 @@ class HPPInterface:
         print("\nPose of the object : \n", poses, "\n")
 
         found, msg = self.robot.isConfigValid(q_init)
+        print(msg)
 
         # Resolving the path to the object
         if found:
@@ -248,6 +256,7 @@ class HPPInterface:
         else:
             print("[INFO] Object found but not collision free")
             print("Trying solving without playing path for simulation ...")
+            print(msg)
             return
 
 
