@@ -73,7 +73,7 @@ class HPPInterface:
             else robot_urdf_string
         )
         save_demo_urdf_path = str(package_location / "demo_parsed.urdf")
-        with open(save_demo_urdf_path, 'w') as file:
+        with open(save_demo_urdf_path, "w") as file:
             file.write(urdf_string)
         print(f"String has been saved to {save_demo_urdf_path}")
 
@@ -98,9 +98,7 @@ class HPPInterface:
         self.robot = Robot("robot", self.robot_name, rootJointType="anchor")
         # self.robot.opticalFrame = "camera_color_optical_frame"
         # TODO: get joint names automatically
-        shrinkJointRange(
-            self.robot, [f"fer/fer_joint{i}" for i in range(1, 8)], 0.95
-        )
+        shrinkJointRange(self.robot, [f"fer/fer_joint{i}" for i in range(1, 8)], 0.95)
 
     def set_problem(self):
         # Setup problem solver and parameters
@@ -146,7 +144,7 @@ class HPPInterface:
 
         # Create robot gripper handle, x-axis is facing down (for pregrasp)
         self.ps.client.manipulation.robot.addGripper(
-            f"{self.robot_name}/support_link",
+            f"{self.robot_name}/fer_link0",
             "goal/gripper",
             self.goal_obj_pose[:3] + [0, sqrt(2) / 2, 0, sqrt(2) / 2],
             0.0,
