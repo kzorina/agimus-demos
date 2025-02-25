@@ -7,13 +7,17 @@ import pinocchio as pin
 import time
 import re
 
+from rclpy.serialization import deserialize_message
 from rclpy.node import Node
+
+# from rclpy.qos import QoSProfile, ReliabilityPolicy
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 
+from agimus_msgs.msg import MpcInput
 from geometry_msgs.msg import Pose
 from sensor_msgs.msg import JointState
 from vision_msgs.msg import Detection2DArray
-
+from rosbag2_py import SequentialReader, StorageOptions, ConverterOptions
 from agimus_demo_05_pick_and_place.franka_gripper_client import FrankaGripperClient
 
 from agimus_demo_05_pick_and_place.hpp_client import (
@@ -89,12 +93,82 @@ class Orchestrator(object):
             "/target_object",
             QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT),
         )
+        # self.subscriber_mpc_input = self._node.create_subscription(
+        #     MpcInput,
+        #     "/mpc_input",
+        #     self.mpc_input_callback,
+        #     qos_profile=QoSProfile(
+        #         depth=1,
+        #         durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        #         reliability=ReliabilityPolicy.RELIABLE,
+        #     ),
+        # )
+        current_robot_state = self.state_client.wait_for_future()
+        self.q_init = list(current_robot_state.position)
+        self.processed_q_list = []
         # self.vision_client = AsyncSubscriber(
         #     self._node,
         #     Detection2DArray,
         #     "/happypose/detections",
         #     QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT),
         # )
+
+    def deserialize_q(self, data):
+        # Deserialize the message into the correct type
+        # Assuming it's a custom message (change the type based on your message)
+        message = MpcInput()
+        message.deserialize(data)
+        return message.q
+
+    def process_messages(self, skip_first=0):
+        bag_file_path = "/home/gepetto/ros2_ws/src/agimus-demos/rosbags/rosbag2_2025_02_24-12_29_26/rosbag2_2025_02_24-12_29_26_0.db3"
+        reader = SequentialReader()
+        storage_options = StorageOptions(uri=bag_file_path, storage_id="sqlite3")
+        converter_options = ConverterOptions()
+        reader.open(storage_options, converter_options)
+        counter = 0
+        while reader.has_next():
+            # Read the next message
+            topic, data, timestamp = reader.read_next()
+            counter += 1
+            if counter < skip_first:
+                print("skipping")
+                continue
+
+            # Check if the message is on the /mpc_input topic
+            if topic == "/mpc_input":
+                print("Processing")
+                # Deserialize the message
+                # message = self.deserialize_q(data)
+
+                # Apply custom processing to the message (for example, logging the message content)
+                # self_node.get_logger().info(f"Processing message: {message}")
+
+                # Apply your custom processing here:
+                # Example: Modify message fields, apply transformations, etc.
+
+                # Optionally, publish the processed message
+                # self.fake_plan(deserialize_message(data, MpcInput))
+                self.processed_q_list.append(deserialize_message(data, MpcInput).q)
+
+                # Sleep for a short time if you want to simulate real-time publishing
+                # rclpy.sleep(0.1)  # Adjust this to simulate the desired rate
+        print("done")
+        # self._node.get_logger().info("Bag processing complete.")
+
+    def fake_plan(self, data: MpcInput):
+        """Check if the config is valid in current HPP setup"""
+        print("Faking the plan with ", data.q)
+        hpp_q = (
+            list(data.q)
+            + [0.0, 0.0]
+            + self.hpp_client.start_obj_pose
+            + self.hpp_client.default_obstacle_pose
+        )
+        hpp_q[7] = min(0.4, max(0.0, hpp_q[7]))
+        hpp_q[8] = min(0.4, max(0.0, hpp_q[8]))
+        self.hpp_client.fake_plan(q_list=hpp_q, q_init=self.q_init)
+        self.hpp_client.restart()
 
     def get_most_confident_object_pose(
         self, detection_msg: Detection2DArray
@@ -164,6 +238,7 @@ class Orchestrator(object):
             + self.hpp_client.start_obj_pose
             + self.hpp_client.default_obstacle_pose
         )
+        print(hpp_q_init)
         self.hpp_client.robot.setCurrentConfig(hpp_q_init)
         # TODO: change from hardcoded robot name
         cam_in_world_pose = self.hpp_client.robot.getLinkPosition(

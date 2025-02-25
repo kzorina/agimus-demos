@@ -56,15 +56,15 @@ class HPPInterface:
         robot_name: str = "fer",
         robot_urdf_string: str = "",
         robot_srdf_string: str = "",
-        start_obj_pose: list[float] = [0.45, -0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
-        goal_obj_pose: list[float] = [0.45, 0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
+        start_obj_pose: list[float] = [0.5, -0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
+        goal_obj_pose: list[float] = [0.5, 0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
     ):
         self.robot_name = robot_name
         self.start_obj_pose = start_obj_pose
         self.goal_obj_pose = goal_obj_pose
 
         self.default_obstacle_pose = [-0.99, -0.99, 0.761, 0.0, 0.0, 0.0, 1.0]
-        self.default_object_bounds = [-1.0, 1.5, -1.0, 1.0, 0.0, 2.2]
+        self.default_object_bounds = [-1.0, 1.5, -1.0, 1.0, 0.0, 1.0]
         # TODO: maybe this should be a parameter
         package_location = Path(__file__).parent
         urdf_string = (
@@ -175,7 +175,7 @@ class HPPInterface:
         self.corba.reset_problem()
         self.setup_problem()
 
-    def plan(self, q_init: list[float], q_goal: list[float] = None):
+    def fake_plan(self, q, q_init: list[float], q_goal: list[float] = None):
         self.q_init = q_init + self.start_obj_pose + self.default_obstacle_pose
         if q_goal is None:
             q_goal = q_init.copy()
@@ -223,6 +223,77 @@ class HPPInterface:
 
         res, q_init, err = self.binPicking.graph.applyNodeConstraints(
             "free", self.q_init
+        )
+        assert res, f"Robot q_init isn't a valid configuration {err}"
+        poses = np.array(q_init[9:16])
+
+        print(q_init)
+        print("\nPose of the object : \n", poses, "\n")
+
+        found, msg = self.robot.isConfigValid(q_init)
+        print(found)
+        print(msg)
+
+        found, msg = self.robot.isConfigValid(q)
+        if not found:
+            exit(543)
+        print(found)
+        print(msg)
+
+    def plan(self, q_init: list[float], q_goal: list[float] = None):
+        self.q_init = q_init + self.start_obj_pose + self.default_obstacle_pose
+        if q_goal is None:
+            q_goal = q_init.copy()
+        self.q_goal = q_goal + self.goal_obj_pose + self.default_obstacle_pose
+        array_of_q = [self.q_init.copy()]
+        self.binPicking = BinPicking(self.ps)
+        self.binPicking.objects = [self.manip_object.name, self.obstacle_object.name]
+        self.binPicking.robotGrippers = [f"{self.robot_name}/fer_gripper"]
+        self.binPicking.goalGrippers = ["goal/gripper"]
+        self.binPicking.goalHandles = self.goal_handles
+        self.binPicking.handles = self.handles
+        self.binPicking.graphConstraints = ["locked_finger_1", "locked_finger_2"]
+
+        # TODO: restructure this
+        def disable_collision():
+            srdf_disable_collisions = """<robot>\n"""
+            srdf_disable_collisions_fmt = (
+                """  <disable_collisions link1="{}" link2="{}" reason=""/>\n"""
+            )
+            srdf_disable_collisions += srdf_disable_collisions_fmt.format(
+                "box/base_link", "part/base_link"
+            )
+            srdf_disable_collisions += "</robot>"
+            self.robot.client.manipulation.robot.insertRobotSRDFModelFromString(
+                "", srdf_disable_collisions
+            )
+
+        disable_collision()
+
+        build_time_start = time.time()
+        print("Building constraint graph")
+        self.binPicking.buildGraph()
+        build_time_stop = time.time()
+        building_time = build_time_stop - build_time_start
+        print("The graph took ", building_time, "s to build.")
+
+        # Create effector
+        print("Building effector.")
+        self.binPicking.buildEffectors(
+            [f"box/base_link_{i}" for i in range(5)], self.q_init
+        )
+        array_of_q.append(self.q_init.copy())
+
+        print("Generating goal configurations.")
+        self.binPicking.generateGoalConfigs(self.q_goal)
+
+        res, q_init, err = self.binPicking.graph.applyNodeConstraints(
+            "free", self.q_init
+        )
+        array_of_q += [self.q_init.copy(), q_init]
+        np.save(
+            "/home/gepetto/ros2_ws/src/agimus-demos/agimus_demo_05_pick_and_place/agimus_demo_05_pick_and_place/init_qs.npy",
+            np.array(array_of_q, dtype=np.float32),
         )
         assert res, f"Robot q_init isn't a valid configuration {err}"
         poses = np.array(q_init[9:16])

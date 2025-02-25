@@ -30,24 +30,41 @@ from hpp.corbaserver.manipulation import Client as ManipClient, ProblemSolver
 from hpp.corbaserver.manipulation import Constraints, Robot, Rule
 from hpp.corbaserver.problem_solver import _convertToCorbaAny as convertToAny
 from agimus_demo_05_pick_and_place.create_graph import makeGraph
+import numpy as np
 
 
-def generateTargetConfig(robot, graph, edge, qLeaf, qRand):
+def generateTargetConfig(robot, graph, edge, qLeaf, qRand, verbose=False):
     # print(f"gonna segfault? {edge}")
     # node_from, node_to = graph.getNodesConnectedByEdge(edge)
     # print(graph.getConfigErrorForNode(node_from, qLeaf))
     # print(graph.getConfigErrorForNode(node_from, qRand))
-    res, q1, _ = graph.generateTargetConfig(edge, qLeaf, qRand)
+    res = False
+    min_err = np.inf
+    last_q = None
+    for _ in range(10):
+        res, q1, err = graph.generateTargetConfig(edge, qLeaf, qRand)
+        if res:
+            break
+        if err < min_err:
+            min_err = err
+            last_q = q1
+
     # print("NOPE")
     if not res:
-        return None
-    res, _ = robot.isConfigValid(q1)
+        if verbose:
+            print("error is ", min_err)
+            return last_q, False
+        return None, True
+    res, msg = robot.isConfigValid(q1)
     # print("q1: ", q1)
     # print(msg)
     if res:
-        return q1
+        return q1, True
     else:
-        return None
+        if verbose:
+            print(msg)
+            return q1, False
+        return None, True
 
 
 def concatenatePaths(paths):
@@ -90,7 +107,7 @@ def writeHandleInSrdf(robot, handle, clearance, mask):
 
 class BinPicking(object):
     """Define a bin-picking problem."""
-    
+
     """List of object names. The part to grasp is the first one."""
     objects = list()
     robotGrippers = list()
@@ -308,7 +325,7 @@ class BinPicking(object):
                             f"{robotGripper} < {handle} | {irg}-{ih}:"
                             + f"{ggIndex}-{ghIndex}_21",
                         ]
-                        p = self.generateConsecutivePaths(edges, q)
+                        p, _ = self.generateConsecutivePaths(edges, q)
                         if p:
                             self.placePaths[robotGripper][handle] = p
                             found = True
@@ -316,7 +333,7 @@ class BinPicking(object):
                         if found:
                             break
 
-    def generateConsecutivePaths(self, edges, q, Nsamples=50):
+    def generateConsecutivePaths(self, edges, q, Nsamples=50, random_q=False):
         """
         Generate consecutive paths along a list of edges
 
@@ -326,7 +343,9 @@ class BinPicking(object):
           - the input configuration q for the first edge,
           - the end of the previous path for the following edges
         """
+        three_q = []
         for i in range(Nsamples + 1):
+            following = False
             if i == 0:
                 qrand = q[:]
             else:
@@ -336,15 +355,36 @@ class BinPicking(object):
             waypoints = list()
             success = True
             for edge in edges:
-                q1 = generateTargetConfig(self.robot, self.graph, edge, q, qrand)
+                if following:
+                    print("Generating target config on ", edge)
+                q1, is_real = generateTargetConfig(
+                    self.robot,
+                    self.graph,
+                    edge,
+                    q,
+                    self.robot.shootRandomConfig() if random_q else qrand,
+                    verbose=following,
+                )
+
+                if q1 is not None or following:
+                    three_q.append(q1)
+                if not is_real:
+                    q1 = None
+
                 if not q1:
                     success = False
+                    if i == 0:
+                        print("Failed at ", edge)
                     break
+                following = True
                 waypoints.append(q1)
                 q = q1[:]
                 qrand = q1[:]
+
             # If the waypoints have been successfully generated, we
             # plan paths between them
+            #
+            # print(success)
             paths = list()
             if success:
                 for q1, q2, edge in zip(waypoints, waypoints[1:], edges[1:]):
@@ -352,6 +392,7 @@ class BinPicking(object):
                     self.setParam("grasping")
                     p, res, msg = self.transitionPlanner.directPath(q1, q2, True)
                     if not res:
+                        print(msg)
                         success = False
                         break
                     else:
@@ -359,8 +400,13 @@ class BinPicking(object):
                         p = self.transitionPlanner.timeParameterization(p.asVector())
                         paths.append(self.wd(p))
             if success:
-                return concatenatePaths(paths)
-        return None
+                print("SUccess!!!")
+                print(edge)
+                return concatenatePaths(paths), None
+        np_q = np.array(three_q)
+        print(np_q.shape)
+
+        return None, three_q
 
     def checkObjectPoses(self, q):
         """
@@ -379,7 +425,7 @@ class BinPicking(object):
             if q[r : r + 7] != self.q_goal[r : r + 7]:
                 raise RuntimeError(
                     f"Object {o} is in pose {q[r : r + 7]} but "
-                    + "was in pose {self.q_goal[r:r+7]} when pre-computing"
+                    + f"was in pose {self.q_goal[r : r + 7]} when pre-computing"
                     + " goal configurations."
                 )
 
@@ -405,9 +451,9 @@ class BinPicking(object):
                     freeGrasps.append((handle, gripperAxis[2]))
                     res = True
             # Sort handles by increasing z coordinate of gripper axis
-            l = sorted(freeGrasps, key=lambda x: x[1])
-            if len(l) > 0:
-                self._freeGrasps[gripper] = list(zip(*l))[0]
+            sorted_handles = sorted(freeGrasps, key=lambda x: x[1])
+            if len(sorted_handles) > 0:
+                self._freeGrasps[gripper] = list(zip(*sorted_handles))[0]
         return res
 
     def selectGrasp(self, q):
@@ -419,6 +465,7 @@ class BinPicking(object):
                  - pregrasp, grasp, preplace configurations to release the
                    object.
         """
+        q_list_list = []
         for gripper in self.robotGrippers:
             for handle in self._freeGrasps[gripper]:
                 # check that place path exists for this grasp
@@ -432,10 +479,17 @@ class BinPicking(object):
                     f"{gripper} > {handle} | f_12",
                     f"{gripper} > {handle} | f_23",
                 ]
-                pickPath = self.generateConsecutivePaths(edges, q)
+                pickPath, q_list = self.generateConsecutivePaths(
+                    edges, q, Nsamples=100, random_q=True
+                )
+                q_list_list += q_list
                 if pickPath:
                     return gripper, handle, pickPath, placePath
-
+        print("It was a failure")
+        np.save(
+            "/home/gepetto/ros2_ws/src/agimus-demos/agimus_demo_05_pick_and_place/agimus_demo_05_pick_and_place/three_q.npy",
+            np.array(q_list_list, dtype=np.float32),
+        )
         return 4 * (None,)
 
     def setParam(self, state):
