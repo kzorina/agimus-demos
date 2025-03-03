@@ -482,7 +482,8 @@ class BinPicking(object):
                 pickPath, q_list = self.generateConsecutivePaths(
                     edges, q, Nsamples=100, random_q=True
                 )
-                q_list_list += q_list
+                if q_list is not None:
+                    q_list_list += q_list
                 if pickPath:
                     return gripper, handle, pickPath, placePath
         print("It was a failure")

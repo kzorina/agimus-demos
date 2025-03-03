@@ -30,3 +30,4 @@ After the xterm terminal is opened, type there `orchestrator.pick_and_place()`.
 ```bash
 ros2 launch agimus_demo_05_pick_and_place bringup_hw.launch.py arm_id:=fer robot_ip:=<fci-ip>
 ```
+If you face issue with corba that address is in use, call `lsof -i :13331` on the host machine and kill the ghost corba process.

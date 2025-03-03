@@ -56,15 +56,17 @@ class HPPInterface:
         robot_name: str = "fer",
         robot_urdf_string: str = "",
         robot_srdf_string: str = "",
-        start_obj_pose: list[float] = [0.5, -0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
-        goal_obj_pose: list[float] = [0.5, 0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
+        # start_obj_pose: list[float] = [0.5, -0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
+        # goal_obj_pose: list[float] = [0.5, 0.2, 0.1, 0.0, 0.0, 0.0, 1.0],
+        start_obj_pose: list[float] = [0.0, 0.1, 0.99, 0.0, 0.0, 0.0, 1.0],
+        goal_obj_pose: list[float] = [0.0, -0.3, 0.99, 0.0, 0.0, 0.0, 1.0],
     ):
         self.robot_name = robot_name
         self.start_obj_pose = start_obj_pose
         self.goal_obj_pose = goal_obj_pose
 
         self.default_obstacle_pose = [-0.99, -0.99, 0.761, 0.0, 0.0, 0.0, 1.0]
-        self.default_object_bounds = [-1.0, 1.5, -1.0, 1.0, 0.0, 1.0]
+        self.default_object_bounds = [-1.0, 1.5, -1.0, 1.0, 0.0, 2.2]
         # TODO: maybe this should be a parameter
         package_location = Path(__file__).parent
         urdf_string = (
@@ -144,7 +146,8 @@ class HPPInterface:
 
         # Create robot gripper handle, x-axis is facing down (for pregrasp)
         self.ps.client.manipulation.robot.addGripper(
-            f"{self.robot_name}/fer_link0",
+            f"{self.robot_name}/support_link",
+            # f"{self.robot_name}/fer_link0",
             "goal/gripper",
             self.goal_obj_pose[:3] + [0, sqrt(2) / 2, 0, sqrt(2) / 2],
             0.0,
