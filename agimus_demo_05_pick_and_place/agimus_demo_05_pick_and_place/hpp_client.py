@@ -241,7 +241,6 @@ class HPPInterface:
             self.binPicking.buildEffectors(
                 [f"box/base_link_{i}" for i in range(5)], self.q_init
             )
-
             print("Generating goal configurations.")
             self.binPicking.generateGoalConfigs(self.q_goal)
 

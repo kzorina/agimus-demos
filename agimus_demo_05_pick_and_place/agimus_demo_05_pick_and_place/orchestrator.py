@@ -94,6 +94,31 @@ def hardcoded_config_obj26() -> list[float]:
     return float_values
 
 
+def get_graspnet_pose():
+    return np.array(
+        [
+            [0.62605923, 0.77963895, -0.01459453, -0.01735717],
+            [-0.64759797, 0.5302722, 0.54720044, -0.10919087],
+            [0.43435785, -0.3331285, 0.8368744, 0.38605523],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+
+
+def graspnet_to_handle(world_to_cam: pin.SE3) -> pin.SE3:
+    cam_to_grasp = pin.SE3(get_graspnet_pose())
+    # convert graspnet frame to franka hand frame
+    grasp_to_ee = pin.SE3(pin.rpy.rpyToMatrix(0, 0, -np.pi / 2), np.zeros(3))
+    cam_to_ee = cam_to_grasp * grasp_to_ee
+    world_to_ee = world_to_cam * cam_to_ee
+    print("world_to_ee")
+    print(world_to_ee)
+    # from ee to grasp is
+    ee_to_grasp = pin.SE3(pin.rpy.rpyToMatrix(0, 0, 0), np.array([0, 0, 0.103]))
+    # rotate = pin.SE3(pin.rpy.rpyToMatrix(0, 0, 0), np.zeros(3))
+    return world_to_ee * ee_to_grasp
+
+
 def hardcoded_config(object_name: str) -> list[float]:
     if object_name == "obj_21":
         return hardcoded_config_obj21()
@@ -217,19 +242,6 @@ class Orchestrator(object):
             object_name=object_name, use_spline_gradient_based_opt=False
         )
         current_robot_state = self.state_client.wait_for_future()
-        if self.use_hardcoded_poses:
-            # TEMP fix: just hardcode pose from happypose
-            obj_in_cam_pose = hardcoded_config(object_name)
-        else:
-            # REAL setup, TODO: fix communication error when happy pose is running
-            print("waiting for obj pose")
-            object_detections = self.vision_client.wait_for_future()
-            print("got obj pose")
-            obj_in_cam_pose = self.get_most_confident_object_pose(
-                object_detections, object_name
-            )
-        if obj_in_cam_pose is None:
-            raise ValueError(f"No {object_name} object detected")
         hpp_q_init = (
             list(current_robot_state.position)
             + self.hpp_client.start_obj_pose
@@ -240,7 +252,29 @@ class Orchestrator(object):
         cam_in_world_pose = self.hpp_client.robot.getLinkPosition(
             linkName="panda/camera_color_optical_frame"
         )
-        obj_in_world_pose = multiply_poses(cam_in_world_pose, obj_in_cam_pose)
+        if self.use_hardcoded_poses:
+            # TEMP fix: just hardcode pose from happypose
+            if object_name == "default_obj":
+                print(cam_in_world_pose)
+                obj_in_world_pose = graspnet_to_handle(
+                    pin.XYZQUATToSE3(cam_in_world_pose)
+                )
+                obj_in_world_pose = pin.SE3ToXYZQUAT(obj_in_world_pose)
+
+            else:
+                obj_in_cam_pose = hardcoded_config(object_name)
+                if obj_in_cam_pose is None:
+                    raise ValueError(f"No {object_name} object detected")
+                obj_in_world_pose = multiply_poses(cam_in_world_pose, obj_in_cam_pose)
+        else:
+            # REAL setup, TODO: fix communication error when happy pose is running
+            print("waiting for obj pose")
+            object_detections = self.vision_client.wait_for_future()
+            print("got obj pose")
+            obj_in_cam_pose = self.get_most_confident_object_pose(
+                object_detections, object_name
+            )
+
         # TODO: make this better
         obj_in_world_pose[3:] = obj_in_world_pose[3:] / np.linalg.norm(
             obj_in_world_pose[3:]

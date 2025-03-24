@@ -42,9 +42,9 @@ def generateTargetConfig(robot, graph, edge, qLeaf, qRand):
     # print("NOPE")
     if not res:
         return None
-    res, _ = robot.isConfigValid(q1)
+    res, msg = robot.isConfigValid(q1)
     # print("q1: ", q1)
-    # print(msg)
+    print(msg)
     if res:
         return q1
     else:
