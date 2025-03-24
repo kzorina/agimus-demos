@@ -101,6 +101,8 @@ def hardcoded_config(object_name: str) -> list[float]:
         return hardcoded_config_obj23()
     elif object_name == "obj_26":
         return hardcoded_config_obj26()
+    elif object_name == "default_obj":
+        return [0.0, 0.0, 0.3, 0.721, -0.67, -0.15369, -0.0794]
     else:
         raise ValueError(f"Object {object_name} not found")
 
