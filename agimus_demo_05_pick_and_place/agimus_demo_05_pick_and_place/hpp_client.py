@@ -64,7 +64,7 @@ class HPPInterface:
         robot_urdf_string: str = "",
         robot_srdf_string: str = "",
         start_obj_pose: list[float] = [0.0, 0.1, 0.9, 0.0, 0.0, 0.0, 1.0],
-        goal_obj_pose: list[float] = [0.2, -0.4, 0.95, 0.0, 0.0, 0.0, 1.0],
+        goal_obj_pose: list[float] = [0.1, -0.3, 0.93, 0.0, 0.0, 0.0, 1.0],
         use_spline_gradient_based_opt=True,
         gripper_open_value=0.04,
     ):
@@ -234,13 +234,15 @@ class HPPInterface:
         build_time_stop = time.time()
         building_time = build_time_stop - build_time_start
         print("The graph took ", building_time, "s to build.")
-
+        # v = self.vf.createViewer()
+        # breakpoint()
         # Create effector
         if not object_static:
             print("Building effector.")  # this hardcodes sequence of steps
             self.binPicking.buildEffectors(
                 [f"box/base_link_{i}" for i in range(5)], self.q_init
             )
+            # breakpoint()
             print("Generating goal configurations.")
             self.binPicking.generateGoalConfigs(self.q_goal)
 
@@ -260,6 +262,7 @@ class HPPInterface:
             print("[INFO] Object found with no collision")
             print("Solving ...")
             res = False
+
             if object_static:
                 p = self.binPicking.move_in_free(q_init, self.q_goal)
                 print("Free path", p)
@@ -284,6 +287,7 @@ class HPPInterface:
         else:
             print("[INFO] Object found but not collision free")
             print("Trying solving without playing path for simulation ...")
+            print(msg)
             return
 
 

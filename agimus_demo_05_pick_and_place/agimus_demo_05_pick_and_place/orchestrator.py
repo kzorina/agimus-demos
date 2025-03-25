@@ -96,12 +96,18 @@ def hardcoded_config_obj26() -> list[float]:
 
 def get_graspnet_pose():
     return np.array(
+        # best pose obj 23
         [
-            [0.62605923, 0.77963895, -0.01459453, -0.01735717],
-            [-0.64759797, 0.5302722, 0.54720044, -0.10919087],
-            [0.43435785, -0.3331285, 0.8368744, 0.38605523],
+            [-0.6334359, 0.7723086, -0.04794085, -0.07671691],
+            [-0.6801161, -0.52613074, 0.5105179, -0.06515313],
+            [0.36905417, 0.3559857, 0.8585297, 0.38535887],
             [0.0, 0.0, 0.0, 1.0],
         ]
+        # best pose object 20
+        # [[-0.9788564,  -0.20358302 , 0.01985245, -0.11678547],
+        # [ 0.09792168, -0.38117558 , 0.9193022,  -0.15793388],
+        # [-0.17958704,  0.90180886 , 0.39305136,  0.44814843],
+        # [ 0.     ,     0.   ,       0.   ,       1.        ]]
     )
 
 
@@ -114,9 +120,13 @@ def graspnet_to_handle(world_to_cam: pin.SE3) -> pin.SE3:
     print("world_to_ee")
     print(world_to_ee)
     # from ee to grasp is
-    ee_to_grasp = pin.SE3(pin.rpy.rpyToMatrix(0, 0, 0), np.array([0, 0, 0.103]))
-    # rotate = pin.SE3(pin.rpy.rpyToMatrix(0, 0, 0), np.zeros(3))
-    return world_to_ee * ee_to_grasp
+    ee_to_grasp = pin.SE3(
+        pin.rpy.rpyToMatrix(0, -np.pi / 2, 0), np.array([0, 0, 0.103])
+    )
+
+    return (
+        world_to_ee * ee_to_grasp
+    )  # * pin.SE3(pin.rpy.rpyToMatrix(np.pi / 2, 0, 0), np.zeros(3))
 
 
 def hardcoded_config(object_name: str) -> list[float]:
@@ -199,7 +209,7 @@ class Orchestrator(object):
         ]
 
     def open_gripper(self):
-        self.franka_gripper_cient.send_goal(position=0.039, max_effort=10.0)
+        self.franka_gripper_cient.send_goal(position=0.0385, max_effort=10.0)
         # TODO: change it to something normal
         time.sleep(0.05)
 
@@ -242,8 +252,22 @@ class Orchestrator(object):
             object_name=object_name, use_spline_gradient_based_opt=False
         )
         current_robot_state = self.state_client.wait_for_future()
+        use_hardcoded_joints = False
+        hardcoded_joint_position = [
+            0.3019713947020079,
+            -0.45002621763212636,
+            -0.9749877444982393,
+            -2.5386908407378614,
+            0.23974417996406555,
+            2.25640791633394,
+            -0.14146355876823263,
+            0.035,
+            0.035,
+        ]
         hpp_q_init = (
-            list(current_robot_state.position)
+            hardcoded_joint_position
+            if use_hardcoded_joints
+            else list(current_robot_state.position)
             + self.hpp_client.start_obj_pose
             + self.hpp_client.default_obstacle_pose
         )
@@ -260,6 +284,7 @@ class Orchestrator(object):
                     pin.XYZQUATToSE3(cam_in_world_pose)
                 )
                 obj_in_world_pose = pin.SE3ToXYZQUAT(obj_in_world_pose)
+                print(obj_in_world_pose)
 
             else:
                 obj_in_cam_pose = hardcoded_config(object_name)
@@ -280,6 +305,14 @@ class Orchestrator(object):
             obj_in_world_pose[3:]
         )
         self.hpp_client.start_obj_pose = list(obj_in_world_pose)
+        hpp_q_init = (
+            hardcoded_joint_position
+            if use_hardcoded_joints
+            else list(current_robot_state.position)
+            + self.hpp_client.start_obj_pose
+            + self.hpp_client.default_obstacle_pose
+        )
+        self.hpp_client.robot.setCurrentConfig(hpp_q_init)
         grasp_path, placing_path, freefly_path = self.hpp_client.plan(
             list(current_robot_state.position)
         )
@@ -289,8 +322,8 @@ class Orchestrator(object):
         self.publish(grasp_path)
         if placing_path is not None:
             # TODO: check automatically
-            self.close_gripper()  # for simulation
-            # self.grasp()  # for hardware robot
+            # self.close_gripper()  # for simulation
+            self.grasp()  # for hardware robot
             self.publish(placing_path)
             self.open_gripper()
             self.publish(freefly_path)
