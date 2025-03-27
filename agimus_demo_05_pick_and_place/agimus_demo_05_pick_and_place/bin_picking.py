@@ -425,7 +425,9 @@ class BinPicking(object):
               to - pregrasp, grasp, preplace configurations to grasp the object,
                  - pregrasp, grasp, preplace configurations to release the
                    object.
+        Compare lengths of the paths to select the best one.
         """
+        candidates = list()
         for gripper in self.robotGrippers:
             for handle in self._freeGrasps[gripper]:
                 # check that place path exists for this grasp
@@ -441,8 +443,13 @@ class BinPicking(object):
                 ]
                 pickPath = self.generateConsecutivePaths(edges, q)
                 if pickPath:
-                    return gripper, handle, pickPath, placePath
+                    print("For gripper/handle ", gripper, handle)
+                    candidates.append((gripper, handle, pickPath, placePath))
+                    print("Pick path len:", pickPath.length())
+                    print("Place path len:", placePath.length())
 
+        if len(candidates) > 0:
+            return min(candidates, key=lambda x: x[2].length())
         return 4 * (None,)
 
     def setParam(self, state):

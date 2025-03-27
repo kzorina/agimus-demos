@@ -158,30 +158,6 @@ class HPPInterface:
         self.robot.client.manipulation.robot.insertRobotSRDFModelFromString(
             "panda", srdfString
         )
-        grasp_transforms = [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]]
-        for i, grasp_t in enumerate(grasp_transforms):
-            # Create handle from Grasp generator
-            self.ps.client.manipulation.robot.addHandle(
-                f"{self.manip_object.name}/base_link",
-                f"{self.manip_object.name}/handle{i}",
-                grasp_t,  # xyz_quatxyzw
-                0.03,  # default clearance for handle
-                [1, 1, 1, 1, 1, 1],
-            )
-            print(multiply_poses(grasp_t, [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]))
-            print(type(multiply_poses(grasp_t, [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0])))
-            # Create a goal handle that is opposite to generated grasp
-            # (rotate 180 degrees around y-axis)
-            self.ps.client.manipulation.robot.addHandle(
-                f"{self.manip_object.name}/base_link",
-                f"{self.manip_object.name}/goal_handle{i}",
-                multiply_poses(
-                    grasp_t, [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
-                ),  # xyz_quatxyzw
-                0.01,  # default clearance for goal handle
-                # [1, 1, 1, 0, 1, 1]  # goal mask allows rotation around x-axis
-                [1, 1, 1, 0, 0, 0],  # goal mask allows any rotation
-            )
 
         # Create robot gripper handle, x-axis is facing up (for pregrasp)
         self.ps.client.manipulation.robot.addGripper(
@@ -205,8 +181,31 @@ class HPPInterface:
             prefix=self.manip_object.name + "/",
             srdf_path=self.manip_object.srdfFilename,
         )
-        # Add added handles from Grasp generator
-        for i in range(len(grasp_transforms)):
+
+    def add_handles(self, grasp_transforms):
+        # grasp_transforms = [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]]
+        for i, grasp_t in enumerate(grasp_transforms):
+            # Create handle from Grasp generator
+            self.ps.client.manipulation.robot.addHandle(
+                f"{self.manip_object.name}/base_link",
+                f"{self.manip_object.name}/handle{i}",
+                grasp_t,  # xyz_quatxyzw
+                0.03,  # default clearance for handle
+                [1, 1, 1, 1, 1, 1],
+            )
+            # Create a goal handle that is opposite to generated grasp
+            # (rotate 180 degrees around y-axis)
+            self.ps.client.manipulation.robot.addHandle(
+                f"{self.manip_object.name}/base_link",
+                f"{self.manip_object.name}/goal_handle{i}",
+                multiply_poses(
+                    grasp_t, [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+                ),  # xyz_quatxyzw
+                0.01,  # default clearance for goal handle
+                # [1, 1, 1, 0, 1, 1]  # goal mask allows rotation around x-axis
+                [1, 1, 1, 0, 0, 0],  # goal mask allows any rotation
+            )
+            # Add handles to respective lists
             self.handles.append(f"{self.manip_object.name}/handle{i}")
             self.goal_handles.append(f"{self.manip_object.name}/goal_handle{i}")
 

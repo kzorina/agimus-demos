@@ -106,7 +106,7 @@ def get_graspnet_pose():
     )
 
 
-def graspnet_to_handle(world_to_cam: pin.SE3) -> pin.SE3:
+def graspnet_to_handle(world_to_cam: pin.SE3) -> list[float]:
     cam_to_grasp = pin.SE3(get_graspnet_pose())
     # convert graspnet frame to franka hand frame
     grasp_to_ee = pin.SE3(pin.rpy.rpyToMatrix(0, 0, -np.pi / 2), np.zeros(3))
@@ -118,10 +118,10 @@ def graspnet_to_handle(world_to_cam: pin.SE3) -> pin.SE3:
     ee_to_grasp = pin.SE3(
         pin.rpy.rpyToMatrix(0, -np.pi / 2, 0), np.array([0, 0, 0.103])
     )
-
-    return (
-        world_to_ee * ee_to_grasp
-    )  # * pin.SE3(pin.rpy.rpyToMatrix(np.pi / 2, 0, 0), np.zeros(3))
+    handle_in_world = world_to_ee * ee_to_grasp
+    print("handle_in_world")
+    print(handle_in_world)
+    return pin.SE3ToXYZQUAT(handle_in_world).tolist()
 
 
 def hardcoded_config(object_name: str) -> list[float]:
@@ -132,7 +132,7 @@ def hardcoded_config(object_name: str) -> list[float]:
     elif object_name == "obj_26":
         return hardcoded_config_obj26()
     elif object_name == "default_obj":
-        return [0.0, 0.0, 0.3, 0.721, -0.67, -0.15369, -0.0794]
+        return [0.23, -0.28, 0.97, 0.0, 0.0, 0.0, 1.0]
     else:
         raise ValueError(f"Object {object_name} not found")
 
@@ -273,19 +273,24 @@ class Orchestrator(object):
         )
         if self.use_hardcoded_poses:
             # TEMP fix: just hardcode pose from happypose
+            obj_in_cam_pose = hardcoded_config(object_name)
+            if obj_in_cam_pose is None:
+                raise ValueError(f"No {object_name} object detected")
+            obj_in_world_pose = multiply_poses(cam_in_world_pose, obj_in_cam_pose)
+            handles_to_add = []
             if object_name == "default_obj":
+                obj_in_world_pose = hardcoded_config(object_name)
                 print(cam_in_world_pose)
-                obj_in_world_pose = graspnet_to_handle(
+                handle_in_world_pose = graspnet_to_handle(
                     pin.XYZQUATToSE3(cam_in_world_pose)
                 )
-                obj_in_world_pose = pin.SE3ToXYZQUAT(obj_in_world_pose)
-                print(obj_in_world_pose)
-
-            else:
-                obj_in_cam_pose = hardcoded_config(object_name)
-                if obj_in_cam_pose is None:
-                    raise ValueError(f"No {object_name} object detected")
-                obj_in_world_pose = multiply_poses(cam_in_world_pose, obj_in_cam_pose)
+                handles_to_add.append([0.0, 0.0, 0.0] + handle_in_world_pose[3:])
+                # rotate around x np.pi to account for both possible orientations of gripper
+                handle_in_world_pose = multiply_poses(
+                    handle_in_world_pose, [0, 0, 0, 1, 0, 0, 0]
+                )
+                handles_to_add.append([0.0, 0.0, 0.0] + handle_in_world_pose[3:])
+            self.hpp_client.add_handles(handles_to_add)
         else:
             # REAL setup, TODO: fix communication error when happy pose is running
             print("waiting for obj pose")
