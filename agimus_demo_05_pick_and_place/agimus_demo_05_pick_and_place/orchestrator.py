@@ -21,17 +21,12 @@ from agimus_demo_05_pick_and_place.hpp_client import (
 )
 from agimus_demo_05_pick_and_place.async_subscriber import AsyncSubscriber
 from agimus_demo_05_pick_and_place.trajectory_publisher import TrajectoryPublisher
+from agimus_demo_05_pick_and_place.utils import multiply_poses
 
 
 def map_object_id(obj_id, dataset="tless"):
     num_part = obj_id.split("_")[1]
     return f"{dataset}-obj_{int(num_part):06d}"
-
-
-def multiply_poses(pose1: list[float], pose2: list[float]) -> list[float]:
-    p1 = pin.XYZQUATToSE3(pose1)
-    p2 = pin.XYZQUATToSE3(pose2)
-    return pin.SE3ToXYZQUAT(p1 * p2)
 
 
 def hardcoded_config_obj21() -> list[float]:
@@ -322,8 +317,8 @@ class Orchestrator(object):
         self.publish(grasp_path)
         if placing_path is not None:
             # TODO: check automatically
-            # self.close_gripper()  # for simulation
-            self.grasp()  # for hardware robot
+            self.close_gripper()  # for simulation
+            # self.grasp()  # for hardware robot
             self.publish(placing_path)
             self.open_gripper()
             self.publish(freefly_path)

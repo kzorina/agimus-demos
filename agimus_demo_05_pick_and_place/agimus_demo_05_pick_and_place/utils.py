@@ -1,5 +1,12 @@
 import numpy as np
 import xml.etree.ElementTree as ET
+import pinocchio as pin
+
+
+def multiply_poses(pose1: list[float], pose2: list[float]) -> list[float]:
+    p1 = pin.XYZQUATToSE3(pose1)
+    p2 = pin.XYZQUATToSE3(pose2)
+    return pin.SE3ToXYZQUAT(p1 * p2).tolist()
 
 
 def concatenatePaths(paths, c_robot=None):

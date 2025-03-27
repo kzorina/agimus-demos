@@ -411,6 +411,10 @@ class BinPicking(object):
             sorted_handles = sorted(freeGrasps, key=lambda x: x[1])
             if len(sorted_handles) > 0:
                 self._freeGrasps[gripper] = list(zip(*sorted_handles))[0]
+                print(
+                    "In computeFreeGrasps, free grasps for gripper",
+                    self._freeGrasps[gripper],
+                )
         return res
 
     def selectGrasp(self, q):

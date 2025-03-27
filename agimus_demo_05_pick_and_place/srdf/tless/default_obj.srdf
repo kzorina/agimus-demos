@@ -5,20 +5,20 @@
     <mask>1 1 1 0 1 1</mask>
   </handle> -->
 
-  <handle name="goal_handle2" clearance="0.03">
+  <!-- <handle name="goal_handle2" clearance="0.03">
     <position xyz="0.0 0.0 0.0" xyzw="0.0 0 1.0 0"/>
     <link name="base_link"/>
     <mask>1 1 1 0 1 1</mask>
-  </handle>
+  </handle> -->
 
   <!-- <handle name="identity_handle" clearance="0.03">
       <position xyz="0 0 0" xyzw="0.0 0 0.0 1"/>
       <link name="base_link"/>
       <mask>1 1 1 1 1 1</mask>
   </handle> -->
-  <handle name="identity_handle_rotated" clearance="0.03">
+  <!-- <handle name="identity_handle_rotated" clearance="0.03">
     <position xyz="0 0 0" xyzw="1 0 0 0"/>
     <link name="base_link"/>
     <mask>1 1 1 1 1 1</mask>
-  </handle>
+  </handle> -->
 </robot>
