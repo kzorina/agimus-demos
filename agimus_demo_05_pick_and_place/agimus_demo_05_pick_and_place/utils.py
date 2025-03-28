@@ -9,6 +9,18 @@ def multiply_poses(pose1: list[float], pose2: list[float]) -> list[float]:
     return pin.SE3ToXYZQUAT(p1 * p2).tolist()
 
 
+def inverse_pose(pose: list[float]) -> list[float]:
+    p = pin.XYZQUATToSE3(pose)
+    return pin.SE3ToXYZQUAT(p.inverse()).tolist()
+
+
+def config_dist(q1: list[float], q2: list[float]) -> float:
+    """Computes distance between two configurations.
+    Initial implementation is just Euclidean distance between the two
+    """
+    return np.linalg.norm(np.array(q1) - np.array(q2))
+
+
 def concatenatePaths(paths, c_robot=None):
     if len(paths) == 0:
         return None

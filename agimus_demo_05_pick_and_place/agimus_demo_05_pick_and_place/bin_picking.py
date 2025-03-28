@@ -30,7 +30,7 @@ from hpp.corbaserver.manipulation import Client as ManipClient, ProblemSolver
 from hpp.corbaserver.manipulation import Constraints, Robot, Rule
 from hpp.corbaserver.problem_solver import _convertToCorbaAny as convertToAny
 from agimus_demo_05_pick_and_place.create_graph import makeGraph
-from agimus_demo_05_pick_and_place.utils import concatenatePaths
+from agimus_demo_05_pick_and_place.utils import concatenatePaths, config_dist
 
 
 def generateTargetConfig(robot, graph, edge, qLeaf, qRand):
@@ -425,9 +425,9 @@ class BinPicking(object):
               to - pregrasp, grasp, preplace configurations to grasp the object,
                  - pregrasp, grasp, preplace configurations to release the
                    object.
-        Compare lengths of the paths to select the best one.
+        If rotated handle is also in free grasps, select the closer one
+        Assumption is that closer one would have first PickPath configuration closer to q_init
         """
-        candidates = list()
         for gripper in self.robotGrippers:
             for handle in self._freeGrasps[gripper]:
                 # check that place path exists for this grasp
@@ -443,13 +443,32 @@ class BinPicking(object):
                 ]
                 pickPath = self.generateConsecutivePaths(edges, q)
                 if pickPath:
-                    print("For gripper/handle ", gripper, handle)
-                    candidates.append((gripper, handle, pickPath, placePath))
-                    print("Pick path len:", pickPath.length())
-                    print("Place path len:", placePath.length())
+                    # if handle_rotated is in self._freeGrasps[gripper], compare the two
+                    # return the one where difference in q is smallest
+                    if handle + "_rotated" in self._freeGrasps[gripper]:
+                        edges = [
+                            f"{gripper} > {handle}_rotated | f_01",
+                            f"{gripper} > {handle}_rotated | f_12",
+                            f"{gripper} > {handle}_rotated | f_23",
+                        ]
+                        rotated_placePath = self.placePaths[gripper].get(
+                            handle + "_rotated"
+                        )
+                        if rotated_placePath:
+                            rotated_pickPath = self.generateConsecutivePaths(edges, q)
+                            if rotated_pickPath:
+                                q1 = pickPath.initial()
+                                q2 = rotated_pickPath.initial()
+                                if config_dist(q2, q) < config_dist(q1, q):
+                                    return (
+                                        gripper,
+                                        handle + "_rotated",
+                                        rotated_pickPath,
+                                        rotated_placePath,
+                                    )
 
-        if len(candidates) > 0:
-            return min(candidates, key=lambda x: x[2].length())
+                    return gripper, handle, pickPath, placePath
+
         return 4 * (None,)
 
     def setParam(self, state):

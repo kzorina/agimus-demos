@@ -65,7 +65,7 @@ class HPPInterface:
         robot_urdf_string: str = "",
         robot_srdf_string: str = "",
         start_obj_pose: list[float] = [0.0, 0.1, 0.9, 0.0, 0.0, 0.0, 1.0],
-        goal_obj_pose: list[float] = [0.1, -0.3, 0.93, 0.0, 0.0, 0.0, 1.0],
+        goal_obj_pose: list[float] = [0.1, -0.4, 0.99, 0.0, 0.0, 0.0, 1.0],
         use_spline_gradient_based_opt=True,
         gripper_open_value=0.04,
     ):
@@ -185,6 +185,8 @@ class HPPInterface:
     def add_handles(self, grasp_transforms):
         # grasp_transforms = [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]]
         for i, grasp_t in enumerate(grasp_transforms):
+            # Normalize quaternion (TODO: find out why pin.SE3 results in less normalized value)
+            grasp_t[3:] = grasp_t[3:] / np.linalg.norm(grasp_t[3:])
             # Create handle from Grasp generator
             self.ps.client.manipulation.robot.addHandle(
                 f"{self.manip_object.name}/base_link",
@@ -193,6 +195,15 @@ class HPPInterface:
                 0.03,  # default clearance for handle
                 [1, 1, 1, 1, 1, 1],
             )
+            # rotate around x np.pi to account for both possible orientations of gripper
+            self.ps.client.manipulation.robot.addHandle(
+                f"{self.manip_object.name}/base_link",
+                f"{self.manip_object.name}/handle{i}_rotated",
+                multiply_poses(grasp_t, [0, 0, 0, 1, 0, 0, 0]),  # xyz_quatxyzw
+                0.03,  # default clearance for handle
+                [1, 1, 1, 1, 1, 1],
+            )
+
             # Create a goal handle that is opposite to generated grasp
             # (rotate 180 degrees around y-axis)
             self.ps.client.manipulation.robot.addHandle(
@@ -207,6 +218,7 @@ class HPPInterface:
             )
             # Add handles to respective lists
             self.handles.append(f"{self.manip_object.name}/handle{i}")
+            self.handles.append(f"{self.manip_object.name}/handle{i}_rotated")
             self.goal_handles.append(f"{self.manip_object.name}/goal_handle{i}")
 
     def setup_problem(self):
