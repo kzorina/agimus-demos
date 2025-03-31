@@ -25,9 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from math import sqrt
-from agimus_demo_05_pick_and_place.corba import CorbaServer
 from hpp.corbaserver import shrinkJointRange
-from hpp.corbaserver.manipulation import Robot, newProblem, ProblemSolver
+from hpp.corbaserver.manipulation import Robot, newProblem, ProblemSolver, Client
 from hpp.gepetto.manipulation import ViewerFactory
 from agimus_demo_05_pick_and_place.bin_picking import BinPicking
 import numpy as np
@@ -101,8 +100,11 @@ class HPPInterface:
             srdf_path=retrieve_resource(f"{package_location}/srdf/big_box.srdf"),
             name="box",
         )
-        # Init corbaserver
-        self.corba = CorbaServer()
+        # Init corbaserver programmatically
+        # self.corba = CorbaServer()
+        # if hppcorbaserver runs already
+        Client().problem.resetProblem()
+
         self.setup_problem()
 
     def set_robot(self):

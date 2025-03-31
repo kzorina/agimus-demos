@@ -14,6 +14,8 @@ from geometry_msgs.msg import Pose
 from sensor_msgs.msg import JointState
 from vision_msgs.msg import Detection2DArray
 
+from hpp.corbaserver.manipulation import loadServerPlugin
+
 from agimus_demo_05_pick_and_place.franka_gripper_client import FrankaGripperClient
 
 from agimus_demo_05_pick_and_place.hpp_client import (
@@ -185,6 +187,8 @@ class Orchestrator(object):
             )
         self.open_gripper()
         self.detected_grasps = simulate_graspnet_output()
+        loadServerPlugin("corbaserver", "manipulation-corba.so")
+        loadServerPlugin("corbaserver", "bin_picking.so")
 
     def select_object_to_pick(self) -> list[tuple[np.array, float]]:
         """The first object to pick is the one that is the closest to the camera on z-axis"""
@@ -262,7 +266,7 @@ class Orchestrator(object):
         self.hpp_client.goal_obj_pose = backup_goal_pose.copy()
         # del self.hpp_client
 
-    def pick_and_place(self, object_name: str):
+    def pick_and_place(self, object_name: str, return_to_init=True):
         self.hpp_client = HPPInterface(
             object_name=object_name, use_spline_gradient_based_opt=False
         )
@@ -371,12 +375,19 @@ class Orchestrator(object):
                 self.grasp()  # for hardware robot
             self.publish(placing_path)
             self.open_gripper()
-            self.publish(freefly_path)
+            if return_to_init:
+                self.publish(freefly_path)
         if object_name == "default_obj":
             self.detected_grasps.pop(object_to_pick)
         # Commented out since restart does not work properly (corba crashes)
         # self.hpp_client.restart()
         # del self.hpp_client
+
+    def pick_and_place_all(self):
+        while len(self.detected_grasps) > 0:
+            print("Picking the object")
+            self.pick_and_place("default_obj", return_to_init=False)
+            time.sleep(1.0)  # update if your computer is strong
 
     # def go_to_ee(self, target_ee):
     #     current_robot_state = self.state_client.wait_for_new_state()
