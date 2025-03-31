@@ -8,13 +8,16 @@ import time
 import re
 import pickle
 
+import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, qos_profile_system_default
 from geometry_msgs.msg import Pose
 from sensor_msgs.msg import JointState
 from vision_msgs.msg import Detection2DArray
 
+
 from hpp.corbaserver.manipulation import loadServerPlugin
+from contact_graspnet_msgs.srv import GetSceneGrasps
 
 from agimus_demo_05_pick_and_place.franka_gripper_client import FrankaGripperClient
 
@@ -112,7 +115,7 @@ def get_graspnet_pose():
 def simulate_graspnet_output() -> dict[list[tuple[np.array, float]]]:
     fname = "/home/gepetto/ros2_ws/src/agimus-demos/agimus_demo_05_pick_and_place/graspnet_output.pkl"
     return pickle.load(open(fname, "rb"))
-    # # every dict key is list 4x4 pose (cam to grasp) and score
+    # # every dict key is list of tuples  (4x4 pose (cam to grasp), score)
     # res['1_tless20'] = [
     #     (np.eye(4), 0.9),
     #     (np.eye(4), 0.8),
@@ -141,6 +144,23 @@ def hardcoded_config(object_name: str) -> list[float]:
         return hardcoded_config_obj26()
     else:
         raise ValueError(f"Object {object_name} not found")
+
+
+def posemsg2mat(pose: Pose) -> npt.NDArray:
+    """Convert a ROS2 Pose message to a 4x4 numpy array."""
+    return pin.XYZQUATToSE3(
+        np.array(
+            [
+                pose.position.x,
+                pose.position.y,
+                pose.position.z,
+                pose.orientation.x,
+                pose.orientation.y,
+                pose.orientation.z,
+                pose.orientation.w,
+            ]
+        )
+    ).homogeneous
 
 
 @dataclass
@@ -185,10 +205,43 @@ class Orchestrator(object):
                 "/happypose/detections",
                 qos_profile_system_default,
             )
+
+        self.grasps_client = self._node.create_client(
+            GetSceneGrasps, "contact_graspnet/get_scene_grasps"
+        )
+
         self.open_gripper()
-        self.detected_grasps = simulate_graspnet_output()
         loadServerPlugin("corbaserver", "manipulation-corba.so")
         loadServerPlugin("corbaserver", "bin_picking.so")
+        # self.detected_grasps = simulate_graspnet_output()
+        self.detected_grasps = self.get_all_grasps()
+
+    def get_all_grasps(self) -> dict[list[tuple[np.array, float]]]:
+        """Get all grasps from the graspnet service"""
+        self.grasps_client.wait_for_service()
+        self._node.get_logger().info("Graspnet service is available, calling...")
+        request = GetSceneGrasps.Request()
+        future = self.grasps_client.call_async(request)
+        rclpy.spin_until_future_complete(self._node, future)
+        self._node.get_logger().info("Graspnet service response received!")
+        resp: GetSceneGrasps.GetSceneGrasps.Response = future.result()
+        scene_grasps = resp.scene_grasps
+
+        object_nb = len(scene_grasps.object_types)
+        all_grasps = {}
+        for i in range(object_nb):
+            object_type = scene_grasps.object_types[i]
+            object_id = f"{i}_{object_type}"
+
+            # grasps of the i-th object
+            grasps_i = scene_grasps.object_grasps[i]
+
+            all_grasps[object_id] = [
+                (posemsg2mat(grasp), score)
+                for grasp, score in zip(grasps_i.grasps, grasps_i.scores)
+            ]
+
+        return all_grasps
 
     def select_object_to_pick(self) -> list[tuple[np.array, float]]:
         """The first object to pick is the one that is the closest to the camera on z-axis"""
