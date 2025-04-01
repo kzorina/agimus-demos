@@ -182,7 +182,7 @@ class Orchestrator(object):
         self.franka_gripper_cient = FrankaGripperClient(self._node)
         self.default_object_name = "obj_23"
         self.use_hardcoded_poses = True
-        self.run_in_sim = True
+        self.run_in_sim = False
 
         self.trajectory_publisher = TrajectoryPublisher(self._node)
 
@@ -416,8 +416,18 @@ class Orchestrator(object):
         grasp_path, placing_path, freefly_path = self.hpp_client.plan(
             list(current_robot_state.position)
         )
-
-        self.open_gripper()
+        # self.go_to([
+        #     0.2675230724769726,
+        #     -0.3003997491702699,
+        #     0.062178244123872704,
+        #     -2.185557396537362,
+        #     -0.12250506031051378,
+        #     2.1027184269693158,
+        #     1.2193136738787091,
+        #     0.03,
+        #     0.03
+        # ])
+        # self.open_gripper()
         self.open_gripper()
         self.publish(grasp_path)
         if placing_path is not None:
