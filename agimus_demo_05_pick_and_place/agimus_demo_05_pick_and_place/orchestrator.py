@@ -216,6 +216,9 @@ class Orchestrator(object):
         # self.detected_grasps = simulate_graspnet_output()
         self.detected_grasps = self.get_all_grasps()
 
+        current_robot_state = self.state_client.wait_for_future()
+        self.grasp_q = list(current_robot_state.position)
+
     def get_all_grasps(self) -> dict[list[tuple[np.array, float]]]:
         """Get all grasps from the graspnet service"""
         self.grasps_client.wait_for_service()
@@ -346,16 +349,22 @@ class Orchestrator(object):
             + self.hpp_client.start_obj_pose
             + self.hpp_client.default_obstacle_pose
         )
-        self.hpp_client.robot.setCurrentConfig(hpp_q_init)
-        # TODO: change from hardcoded robot name
-        cam_in_world_pose = self.hpp_client.robot.getLinkPosition(
-            linkName="panda/camera_color_optical_frame"
-        )
         if self.use_hardcoded_poses:
             # TEMP fix: just hardcode pose from happypose
 
             handles_to_add = []
             if object_name == "default_obj":
+                grasp_hpp_q = (
+                    self.grasp_q
+                    + self.hpp_client.start_obj_pose
+                    + self.hpp_client.default_obstacle_pose
+                )
+                self.hpp_client.robot.setCurrentConfig(grasp_hpp_q)
+                # TODO: change from hardcoded robot name
+                cam_in_world_pose = self.hpp_client.robot.getLinkPosition(
+                    linkName="panda/camera_color_optical_frame"
+                )
+
                 object_to_pick = self.select_object_to_pick()
                 possible_grasps = self.detected_grasps[object_to_pick]
                 # sort and leave only 20 best grasps
@@ -388,6 +397,11 @@ class Orchestrator(object):
                 # handles_to_add.append([0.0, 0.0, 0.0] + handle_in_world_pose[3:])
                 self.hpp_client.add_handles(handles_to_add)
             else:
+                self.hpp_client.robot.setCurrentConfig(hpp_q_init)
+                # TODO: change from hardcoded robot name
+                cam_in_world_pose = self.hpp_client.robot.getLinkPosition(
+                    linkName="panda/camera_color_optical_frame"
+                )
                 obj_in_cam_pose = hardcoded_config(object_name)
                 if obj_in_cam_pose is None:
                     raise ValueError(f"No {object_name} object detected")
