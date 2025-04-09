@@ -1,4 +1,4 @@
-<robot name="default_obj">
+<robot name="cont_grasp_net_obj">
   <handle name="goal_handle" clearance="0.01">
     <position xyz="0.0 0.0 0.0" xyzw="0.0 1 0.0 0"/>
     <link name="base_link"/>

@@ -95,6 +95,20 @@ def hardcoded_config_obj26() -> list[float]:
     return float_values
 
 
+def get_goal_box_pose(obj_id: str) -> list[float]:
+    # small objects
+    if int(obj_id) in [1, 2, 3, 4, 11, 12, 13, 14, 15, 16]:
+        print("Grasping a small object")
+        return [-0.1, -0.4, 0.99, 0.0, 0.0, 0.0, 1.0]
+    # plugs and stuff
+    elif int(obj_id) in [19, 20, 21, 22, 23, 24]:
+        print("Grasping a plug")
+        return [0.1, -0.4, 0.99, 0.0, 0.0, 0.0, 1.0]
+    else:
+        print("Grasping other stuff")
+        return [0.3, -0.4, 0.99, 0.0, 0.0, 0.0, 1.0]
+
+
 def get_graspnet_pose():
     return np.array(
         # best pose obj 23
@@ -214,8 +228,20 @@ class Orchestrator(object):
         loadServerPlugin("corbaserver", "manipulation-corba.so")
         loadServerPlugin("corbaserver", "bin_picking.so")
         # self.detected_grasps = simulate_graspnet_output()
+        self.first_grasp = True
+        self.lookup_q = [
+            -0.7103129944241657,
+            -1.413310662515943,
+            1.4475245623170094,
+            -2.5898856641865664,
+            0.7130869270563126,
+            1.9907791985935634,
+            2.083702454472581,
+            0.037,
+            0.037,
+        ]
+        self.go_to(self.lookup_q)
         self.detected_grasps = self.get_all_grasps()
-
         current_robot_state = self.state_client.wait_for_future()
         self.grasp_q = list(current_robot_state.position)
 
@@ -320,11 +346,48 @@ class Orchestrator(object):
         # Commented out since restart does not work properly (corba crashes)
         # self.hpp_client.restart()
         self.hpp_client.goal_obj_pose = backup_goal_pose.copy()
+        time.sleep(1.0)
         # del self.hpp_client
 
-    def pick_and_place(self, object_name: str, return_to_init=True):
+    def pick_and_place(
+        self, object_name: str, return_to_init=True, goto=False, go_to_lookup=False
+    ):
+        if object_name == "cont_grasp_net_obj":
+            object_to_pick = self.select_object_to_pick()
+            obj_id = object_to_pick.split("_")[1]
+            goal_box_pose = get_goal_box_pose(obj_id)
+        if goto:
+            # # left side lookup
+            # self.go_to([
+            #     -0.85,
+            #     0.07,
+            #     0.36,
+            #     -2.14,
+            #     0.25,
+            #     2.15,
+            #     0.1,
+            #     0.035,
+            #     0.035,
+            # ])
+            # right side lookup
+            self.go_to(
+                [
+                    -0.6187778391714732,
+                    -0.6458050417226354,
+                    0.2976053259543667,
+                    -2.5886461993189798,
+                    0.6555336587826411,
+                    2.084142860413525,
+                    0.5754631454795599,
+                    0.03848165273666382,
+                    0.03848165273666382,
+                ]
+            )
+
         self.hpp_client = HPPInterface(
-            object_name=object_name, use_spline_gradient_based_opt=False
+            object_name=object_name,
+            use_spline_gradient_based_opt=False,
+            goal_obj_pose=goal_box_pose,
         )
         current_robot_state = self.state_client.wait_for_future()
         if self.run_in_sim:
@@ -353,7 +416,7 @@ class Orchestrator(object):
             # TEMP fix: just hardcode pose from happypose
 
             handles_to_add = []
-            if object_name == "default_obj":
+            if object_name == "cont_grasp_net_obj":
                 grasp_hpp_q = (
                     self.grasp_q
                     + self.hpp_client.start_obj_pose
@@ -365,7 +428,6 @@ class Orchestrator(object):
                     linkName="panda/camera_color_optical_frame"
                 )
 
-                object_to_pick = self.select_object_to_pick()
                 possible_grasps = self.detected_grasps[object_to_pick]
                 # sort and leave only 20 best grasps
                 possible_grasps = sorted(
@@ -430,17 +492,7 @@ class Orchestrator(object):
         grasp_path, placing_path, freefly_path = self.hpp_client.plan(
             list(current_robot_state.position)
         )
-        # self.go_to([
-        #     0.2675230724769726,
-        #     -0.3003997491702699,
-        #     0.062178244123872704,
-        #     -2.185557396537362,
-        #     -0.12250506031051378,
-        #     2.1027184269693158,
-        #     1.2193136738787091,
-        #     0.03,
-        #     0.03
-        # ])
+
         # self.open_gripper()
         self.open_gripper()
         self.publish(grasp_path)
@@ -454,8 +506,13 @@ class Orchestrator(object):
             self.open_gripper()
             if return_to_init:
                 self.publish(freefly_path)
-        if object_name == "default_obj":
-            self.detected_grasps.pop(object_to_pick)
+            if go_to_lookup:
+                self.go_to(self.lookup_q)
+                self.detected_grasps = self.get_all_grasps()
+                current_robot_state = self.state_client.wait_for_future()
+                self.grasp_q = list(current_robot_state.position)
+        # if object_name == "default_obj":
+        #     self.detected_grasps.pop(object_to_pick)
         # Commented out since restart does not work properly (corba crashes)
         # self.hpp_client.restart()
         # del self.hpp_client
@@ -463,8 +520,15 @@ class Orchestrator(object):
     def pick_and_place_all(self):
         while len(self.detected_grasps) > 0:
             print("Picking the object")
-            self.pick_and_place("default_obj", return_to_init=False)
+
+            self.pick_and_place(
+                "cont_grasp_net_obj",
+                return_to_init=False,
+                goto=False,
+                go_to_lookup=True,
+            )
             time.sleep(1.0)  # update if your computer is strong
+            self.first_grasp = False
 
     # def go_to_ee(self, target_ee):
     #     current_robot_state = self.state_client.wait_for_new_state()

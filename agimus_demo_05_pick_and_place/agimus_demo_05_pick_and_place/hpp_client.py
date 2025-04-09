@@ -126,7 +126,7 @@ class HPPInterface:
             self.ps.addPathOptimizer("SimpleTimeParameterization")
         self.ps.setParameter("SimpleTimeParameterization/order", 2)
         self.ps.setParameter("SimpleTimeParameterization/maxAcceleration", 0.2)
-        self.ps.setParameter("SimpleTimeParameterization/safety", 0.95)
+        self.ps.setParameter("SimpleTimeParameterization/safety", 0.98)
 
         # Add path projector to avoid discontinuities
         self.ps.selectPathProjector("Progressive", 0.05)
