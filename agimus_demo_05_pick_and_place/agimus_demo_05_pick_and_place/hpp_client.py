@@ -63,7 +63,7 @@ class HPPInterface:
         object_name: str = "obj_01",
         robot_urdf_string: str = "",
         robot_srdf_string: str = "",
-        start_obj_pose: list[float] = [0.0, 0.1, 0.9, 0.0, 0.0, 0.0, 1.0],
+        start_obj_pose: list[float] = [-1.0, -1.0, 0.9, 0.0, 0.0, 0.0, 1.0],
         goal_obj_pose: list[float] = [0.1, -0.4, 0.99, 0.0, 0.0, 0.0, 1.0],
         use_spline_gradient_based_opt=True,
         gripper_open_value=0.04,

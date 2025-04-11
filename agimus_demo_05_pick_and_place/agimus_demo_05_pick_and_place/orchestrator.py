@@ -102,14 +102,14 @@ def get_goal_box_pose(obj_id: str) -> list[float]:
     # small objects
     if int(obj_id) in [1, 2, 3, 4, 11, 12, 13, 14, 15, 16]:
         print("Grasping a small object")
-        return [-0.1, -0.4, 0.99, 0.0, 0.0, 0.0, 1.0]
+        return [-0.2, -0.3, 0.99, 0.0, 0.0, 0.0, 1.0]
     # plugs and stuff
-    elif int(obj_id) in [19, 20, 21, 22, 23, 24]:
+    elif int(obj_id) in [19, 20, 23, 24]:
         print("Grasping a plug")
-        return [0.1, -0.4, 0.99, 0.0, 0.0, 0.0, 1.0]
+        return [-0.2, -0.1, 0.99, 0.0, 0.0, 0.0, 1.0]
     else:
         print("Grasping other stuff")
-        return [0.3, -0.4, 0.99, 0.0, 0.0, 0.0, 1.0]
+        return [-0.2, 0.1, 0.99, 0.0, 0.0, 0.0, 1.0]
 
 
 def get_graspnet_pose():
@@ -202,16 +202,28 @@ class Orchestrator(object):
         self.first_grasp = True
         # pose from which to take point could for ContactGraspNet
         self.lookup_q = [
-            -0.7103129944241657,
-            -1.413310662515943,
-            1.4475245623170094,
-            -2.5898856641865664,
-            0.7130869270563126,
-            1.9907791985935634,
-            2.083702454472581,
+            1.36157,
+            -1.50321,
+            -1.7610,
+            -1.77725,
+            -0.58821,
+            1.59522,
+            -0.61968,
             0.037,
             0.037,
         ]
+        # # right side
+        # self.lookup_q = [
+        #     -2.1693,
+        #     1.1103,
+        #     1.3593,
+        #     -2.087,
+        #     -0.34934,
+        #     1.8466,
+        #     -0.48208,
+        #     0.037,
+        #     0.037,
+        # ]
         self.go_to(self.lookup_q)
         self.detected_grasps = self.get_all_grasps()
         current_robot_state = self.state_client.wait_for_future()
@@ -295,7 +307,7 @@ class Orchestrator(object):
     def grasp(self):
         self.franka_gripper_cient.grasp()
         # TODO: change it to something normal
-        time.sleep(1.0)
+        time.sleep(2.0)
 
     def publish(self, path_vector):
         traj = get_traj_points_from_path(path_vector)
@@ -445,6 +457,9 @@ class Orchestrator(object):
             if go_to_lookup:
                 self.go_to(self.lookup_q)
                 self.detected_grasps = self.get_all_grasps()
+                input(
+                    f"Continue? (grasps are {len([k for k, v in self.detected_grasps.items() if len(v) > 0])})"
+                )
                 current_robot_state = self.state_client.wait_for_future()
                 self.grasp_q = list(current_robot_state.position)
         # Commented out since restart does not work properly (corba crashes)
