@@ -1,6 +1,8 @@
 import numpy as np
 import xml.etree.ElementTree as ET
 import pinocchio as pin
+from geometry_msgs.msg import Pose
+import numpy.typing as npt
 
 
 def multiply_poses(pose1: list[float], pose2: list[float]) -> list[float]:
@@ -88,3 +90,20 @@ def get_obj_goal_handles(prefix: str, srdf_path: str) -> (list[str], list[str]):
     goal_handles = [prefix + handle for handle in all_handles if "goal" in handle]
     object_handles = [prefix + handle for handle in all_handles if "goal" not in handle]
     return object_handles, goal_handles
+
+
+def posemsg2mat(pose: Pose) -> npt.NDArray:
+    """Convert a ROS2 Pose message to a 4x4 numpy array."""
+    return pin.XYZQUATToSE3(
+        np.array(
+            [
+                pose.position.x,
+                pose.position.y,
+                pose.position.z,
+                pose.orientation.x,
+                pose.orientation.y,
+                pose.orientation.z,
+                pose.orientation.w,
+            ]
+        )
+    ).homogeneous

@@ -284,7 +284,6 @@ class HPPInterface:
             self.binPicking.buildEffectors(
                 [f"box/base_link_{i}" for i in range(5)], self.q_init
             )
-            # breakpoint()
             print("Generating goal configurations.")
             self.binPicking.generateGoalConfigs(self.q_goal)
 
@@ -297,13 +296,6 @@ class HPPInterface:
         print(q_init)
         print("\nPose of the object : \n", poses, "\n")
 
-        found, msg = self.robot.isConfigValid(self.q_goal)
-        print("Q goal is valid - ", found)
-        print(msg)
-        res, self.q_goal, err = self.binPicking.graph.applyNodeConstraints(
-            "free", self.q_goal
-        )
-        assert res, f"Robot q goal isn't a valid configuration {err}"
         found, msg = self.robot.isConfigValid(q_init)
 
         # Resolving the path to the object
@@ -311,7 +303,6 @@ class HPPInterface:
             print("[INFO] Object found with no collision")
             print("Solving ...")
             res = False
-
             if object_static:
                 p = self.binPicking.move_in_free(q_init, self.q_goal)
                 print("Free path", p)

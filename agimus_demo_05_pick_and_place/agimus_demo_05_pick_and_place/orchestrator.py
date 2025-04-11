@@ -6,7 +6,6 @@ import numpy.typing as npt
 import pinocchio as pin
 import time
 import re
-import pickle
 
 import rclpy
 from rclpy.node import Node
@@ -27,7 +26,11 @@ from agimus_demo_05_pick_and_place.hpp_client import (
 )
 from agimus_demo_05_pick_and_place.async_subscriber import AsyncSubscriber
 from agimus_demo_05_pick_and_place.trajectory_publisher import TrajectoryPublisher
-from agimus_demo_05_pick_and_place.utils import multiply_poses, inverse_pose
+from agimus_demo_05_pick_and_place.utils import (
+    multiply_poses,
+    inverse_pose,
+    posemsg2mat,
+)
 
 
 def map_object_id(obj_id, dataset="tless"):
@@ -110,31 +113,15 @@ def get_goal_box_pose(obj_id: str) -> list[float]:
 
 
 def get_graspnet_pose():
+    # best pose obj 23
     return np.array(
-        # best pose obj 23
         [
             [-0.6334359, 0.7723086, -0.04794085, -0.07671691],
             [-0.6801161, -0.52613074, 0.5105179, -0.06515313],
             [0.36905417, 0.3559857, 0.8585297, 0.38535887],
             [0.0, 0.0, 0.0, 1.0],
         ]
-        # best pose object 20
-        # [[-0.9788564,  -0.20358302 , 0.01985245, -0.11678547],
-        # [ 0.09792168, -0.38117558 , 0.9193022,  -0.15793388],
-        # [-0.17958704,  0.90180886 , 0.39305136,  0.44814843],
-        # [ 0.     ,     0.   ,       0.   ,       1.        ]]
     )
-
-
-def simulate_graspnet_output() -> dict[list[tuple[np.array, float]]]:
-    fname = "/home/gepetto/ros2_ws/src/agimus-demos/agimus_demo_05_pick_and_place/graspnet_output.pkl"
-    return pickle.load(open(fname, "rb"))
-    # # every dict key is list of tuples  (4x4 pose (cam to grasp), score)
-    # res['1_tless20'] = [
-    #     (np.eye(4), 0.9),
-    #     (np.eye(4), 0.8),
-    #     (np.eye(4), 0.7),
-    #     ]
 
 
 def graspnet_to_handle(world_to_cam: pin.SE3, cam_to_grasp: pin.SE3) -> list[float]:
@@ -158,23 +145,6 @@ def hardcoded_config(object_name: str) -> list[float]:
         return hardcoded_config_obj26()
     else:
         raise ValueError(f"Object {object_name} not found")
-
-
-def posemsg2mat(pose: Pose) -> npt.NDArray:
-    """Convert a ROS2 Pose message to a 4x4 numpy array."""
-    return pin.XYZQUATToSE3(
-        np.array(
-            [
-                pose.position.x,
-                pose.position.y,
-                pose.position.z,
-                pose.orientation.x,
-                pose.orientation.y,
-                pose.orientation.z,
-                pose.orientation.w,
-            ]
-        )
-    ).homogeneous
 
 
 @dataclass
@@ -225,10 +195,12 @@ class Orchestrator(object):
         )
 
         self.open_gripper()
+        # if hppcorbaserver is running in a separate script
         loadServerPlugin("corbaserver", "manipulation-corba.so")
         loadServerPlugin("corbaserver", "bin_picking.so")
-        # self.detected_grasps = simulate_graspnet_output()
+
         self.first_grasp = True
+        # pose from which to take point could for ContactGraspNet
         self.lookup_q = [
             -0.7103129944241657,
             -1.413310662515943,
@@ -278,7 +250,6 @@ class Orchestrator(object):
         object_to_pick = None
         for k, v in self.detected_grasps.items():
             print(f"Object {k} has {len(v)} grasps")
-            # print(f"Grasps {v}")
             for grasp, _ in v:
                 if grasp[2, 3] < closest_dist:
                     closest_dist = grasp[2, 3]
@@ -349,40 +320,11 @@ class Orchestrator(object):
         time.sleep(1.0)
         # del self.hpp_client
 
-    def pick_and_place(
-        self, object_name: str, return_to_init=True, goto=False, go_to_lookup=False
-    ):
+    def pick_and_place(self, object_name: str, return_to_init=True, go_to_lookup=False):
         if object_name == "cont_grasp_net_obj":
             object_to_pick = self.select_object_to_pick()
             obj_id = object_to_pick.split("_")[1]
             goal_box_pose = get_goal_box_pose(obj_id)
-        if goto:
-            # # left side lookup
-            # self.go_to([
-            #     -0.85,
-            #     0.07,
-            #     0.36,
-            #     -2.14,
-            #     0.25,
-            #     2.15,
-            #     0.1,
-            #     0.035,
-            #     0.035,
-            # ])
-            # right side lookup
-            self.go_to(
-                [
-                    -0.6187778391714732,
-                    -0.6458050417226354,
-                    0.2976053259543667,
-                    -2.5886461993189798,
-                    0.6555336587826411,
-                    2.084142860413525,
-                    0.5754631454795599,
-                    0.03848165273666382,
-                    0.03848165273666382,
-                ]
-            )
 
         self.hpp_client = HPPInterface(
             object_name=object_name,
@@ -452,11 +394,6 @@ class Orchestrator(object):
                             inverse_pose(obj_in_world_pose), handle_in_world_pose
                         )
                     )
-                # rotate around x np.pi to account for both possible orientations of gripper
-                # handle_in_world_pose = multiply_poses(
-                #     handle_in_world_pose, [0, 0, 0, 1, 0, 0, 0]
-                # )
-                # handles_to_add.append([0.0, 0.0, 0.0] + handle_in_world_pose[3:])
                 self.hpp_client.add_handles(handles_to_add)
             else:
                 self.hpp_client.robot.setCurrentConfig(hpp_q_init)
@@ -493,7 +430,6 @@ class Orchestrator(object):
             list(current_robot_state.position)
         )
 
-        # self.open_gripper()
         self.open_gripper()
         self.publish(grasp_path)
         if placing_path is not None:
@@ -511,8 +447,6 @@ class Orchestrator(object):
                 self.detected_grasps = self.get_all_grasps()
                 current_robot_state = self.state_client.wait_for_future()
                 self.grasp_q = list(current_robot_state.position)
-        # if object_name == "default_obj":
-        #     self.detected_grasps.pop(object_to_pick)
         # Commented out since restart does not work properly (corba crashes)
         # self.hpp_client.restart()
         # del self.hpp_client
@@ -524,7 +458,6 @@ class Orchestrator(object):
             self.pick_and_place(
                 "cont_grasp_net_obj",
                 return_to_init=False,
-                goto=False,
                 go_to_lookup=True,
             )
             time.sleep(1.0)  # update if your computer is strong

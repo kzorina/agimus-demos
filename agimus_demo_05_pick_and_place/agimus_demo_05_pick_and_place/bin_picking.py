@@ -42,9 +42,8 @@ def generateTargetConfig(robot, graph, edge, qLeaf, qRand):
     # print("NOPE")
     if not res:
         return None
-    res, msg = robot.isConfigValid(q1)
+    res, _ = robot.isConfigValid(q1)
     # print("q1: ", q1)
-    print(msg)
     if res:
         return q1
     else:
@@ -406,7 +405,6 @@ class BinPicking(object):
                     # Store pairs (handle, score)
                     freeGrasps.append((handle, gripperAxis[2]))
                     res = True
-                    # breakpoint()
             # Sort handles by increasing z coordinate of gripper axis
             sorted_handles = sorted(freeGrasps, key=lambda x: x[1])
             if len(sorted_handles) > 0:
