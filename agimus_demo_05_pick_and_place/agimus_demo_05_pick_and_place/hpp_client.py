@@ -295,7 +295,11 @@ class HPPInterface:
 
         print(q_init)
         print("\nPose of the object : \n", poses, "\n")
-
+        found, msg = self.robot.isConfigValid(self.q_goal)
+        res, self.q_goal, err = self.binPicking.graph.applyNodeConstraints(
+            "free", self.q_goal
+        )
+        assert res, f"Robot q goal isn't a valid configuration {err}"
         found, msg = self.robot.isConfigValid(q_init)
 
         # Resolving the path to the object
