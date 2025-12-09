@@ -30,6 +30,10 @@
   <!--
       Remove collision pairs
   -->
+  <disable_collisions link1="fer_hand" link2="fer_leftfinger"
+  reason="test"/>
+  <disable_collisions link1="fer_hand" link2="fer_rightfinger"
+  reason="test"/>
 
   <!-- Remove collision between all regular links -->
 
