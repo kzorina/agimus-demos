@@ -275,14 +275,15 @@ class Orchestrator(object):
         # find trajectory points idx range where to apply visual servoing
 
         # TODO: add smoothing params to agimus_controller_ros simple_traj_publisher!
-        if visual_servoing_time_range is None:
-            visual_servoing_idx_range = [0, 0]
-        else:
-            visual_servoing_idx_range = [
-                int(t / self.trajectory_publisher.dt) for t in visual_servoing_time_range
-            ]
-            if visual_servoing_time_range[1] == path_vector.length():
-                visual_servoing_idx_range[1] += self.param.ocp_horizon
+        visual_servoing_idx_range = [0, 0]
+        # if visual_servoing_time_range is None:
+        #     visual_servoing_idx_range = [0, 0]
+        # else:
+        #     visual_servoing_idx_range = [
+        #         int(t / self.trajectory_publisher.dt) for t in visual_servoing_time_range
+        #     ]
+        #     if visual_servoing_time_range[1] == path_vector.length():
+        #         visual_servoing_idx_range[1] += self.param.ocp_horizon
 
         # convert arrays in list of trajectory points
         trajectory = (
