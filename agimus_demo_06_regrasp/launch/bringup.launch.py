@@ -76,6 +76,60 @@ def launch_setup(
         child_frame_id="world",
     )
 
+    tf_node_2 = static_transform_publisher_node(
+        frame_id="tless-obj_000023",
+        child_frame_id="current_object",
+    )
+    tf_node_support_link = static_transform_publisher_node(
+        frame_id="support_link",
+        child_frame_id="base",
+        xyz=["0.563", "-0.166", "0.780"],
+        rot_xyzw=["0.000", "0.000", "1.000", "0.000"],
+    )
+    simulated_object_pose = [0.04, -0.14, 0.54, 0.078, 0.031, -0.71, 0.7, ]
+    env_nodes = [tf_node_2, tf_node_support_link]
+    happypose_simulation_params = {
+        "object_id": "tless-obj_000023",
+        "base_name": "support_link",
+        "camera_name": "camera_color_optical_frame",
+        "object_pose_in_base_txyz": simulated_object_pose[:3],
+        "object_pose_in_base_qxyzw": simulated_object_pose[3:],
+    }
+    happypose_simulation_node = Node(
+        package="agimus_demos_common",
+        executable="happypose_simulation",
+        parameters=[get_use_sim_time(), happypose_simulation_params],
+        output="screen",
+    )
+    env_nodes.append(happypose_simulation_node)
+    # # add simulation of vision detection
+    # if vision_type in ["simulate_happypose", "simulate_apriltag_det"]:
+    #     simulated_object_pose = [0.15, -0.2, 1.05, 0.0, 0.0, 0.707, 0.707]
+    #     if vision_type == "simulate_apriltag_det":
+    #         simulated_object_pose_as_str = [str(val) for val in simulated_object_pose]
+    #         tf_node_object_detection = static_transform_publisher_node(
+    #             frame_id="support_link",
+    #             child_frame_id="tless-obj_000031",
+    #             xyz=simulated_object_pose_as_str[:3],
+    #             rot_xyzw=simulated_object_pose_as_str[3:],
+    #         )
+    #         env_nodes.append(tf_node_object_detection)
+    #     elif vision_type == "simulate_happypose":
+    #         happypose_simulation_params = {
+    #             "object_id": "tless-obj_000031",
+    #             "base_name": "support_link",
+    #             "camera_name": "camera_color_optical_frame",
+    #             "object_pose_in_base_txyz": simulated_object_pose[:3],
+    #             "object_pose_in_base_qxyzw": simulated_object_pose[3:],
+    #         }
+    #         happypose_simulation_node = Node(
+    #             package="agimus_demos_common",
+    #             executable="happypose_simulation",
+    #             parameters=[get_use_sim_time(), happypose_simulation_params],
+    #             output="screen",
+    #         )
+
+
     trajectory_weights_yaml = Path(get_package_share_directory("agimus_demo_05_pick_and_place")) / \
                          "config" / "trajectory_weigths_params.yaml"
     use_gazebo = LaunchConfiguration("use_gazebo")
@@ -96,6 +150,7 @@ def launch_setup(
         wait_for_non_zero_joints_node,
         environment_publisher_node,
         tf_node,
+        *env_nodes,
         RegisterEventHandler(
             event_handler=OnProcessExit(
                 target_action=wait_for_non_zero_joints_node,
