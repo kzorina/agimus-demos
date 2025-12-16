@@ -25,6 +25,8 @@ def launch_setup(
     context: LaunchContext, *args, **kwargs
 ) -> list[LaunchDescriptionEntity]:
     franka_robot_launch = generate_include_launch("franka_common_lfc.launch.py")
+    vision_type_arg = LaunchConfiguration("vision_type")
+    vision_type = context.perform_substitution(vision_type_arg).lower()
 
     agimus_controller_yaml = PathJoinSubstitution(
         [
@@ -86,22 +88,23 @@ def launch_setup(
         xyz=["0.563", "-0.166", "0.780"],
         rot_xyzw=["0.000", "0.000", "1.000", "0.000"],
     )
-    simulated_object_pose = [0.04, -0.14, 0.54, 0.078, 0.031, -0.71, 0.7, ]
     env_nodes = [tf_node_2, tf_node_support_link]
-    happypose_simulation_params = {
-        "object_id": "tless-obj_000023",
-        "base_name": "support_link",
-        "camera_name": "camera_color_optical_frame",
-        "object_pose_in_base_txyz": simulated_object_pose[:3],
-        "object_pose_in_base_qxyzw": simulated_object_pose[3:],
-    }
-    happypose_simulation_node = Node(
-        package="agimus_demos_common",
-        executable="happypose_simulation",
-        parameters=[get_use_sim_time(), happypose_simulation_params],
-        output="screen",
-    )
-    env_nodes.append(happypose_simulation_node)
+    if vision_type == "simulate_happypose":
+        simulated_object_pose = [0.04, -0.14, 0.54, 0.078, 0.031, -0.71, 0.7]
+        happypose_simulation_params = {
+            "object_id": "tless-obj_000023",
+            "base_name": "support_link",
+            "camera_name": "camera_color_optical_frame",
+            "object_pose_in_base_txyz": simulated_object_pose[:3],
+            "object_pose_in_base_qxyzw": simulated_object_pose[3:],
+        }
+        happypose_simulation_node = Node(
+            package="agimus_demos_common",
+            executable="happypose_simulation",
+            parameters=[get_use_sim_time(), happypose_simulation_params],
+            output="screen",
+        )
+        env_nodes.append(happypose_simulation_node)
     # # add simulation of vision detection
     # if vision_type in ["simulate_happypose", "simulate_apriltag_det"]:
     #     simulated_object_pose = [0.15, -0.2, 1.05, 0.0, 0.0, 0.707, 0.707]
@@ -129,9 +132,11 @@ def launch_setup(
     #             output="screen",
     #         )
 
-
-    trajectory_weights_yaml = Path(get_package_share_directory("agimus_demo_05_pick_and_place")) / \
-                         "config" / "trajectory_weigths_params.yaml"
+    trajectory_weights_yaml = (
+        Path(get_package_share_directory("agimus_demo_05_pick_and_place"))
+        / "config"
+        / "trajectory_weigths_params.yaml"
+    )
     use_gazebo = LaunchConfiguration("use_gazebo")
     use_gazebo_bool = context.perform_substitution(use_gazebo).lower() == "true"
     regrasp_node = ExecuteProcess(

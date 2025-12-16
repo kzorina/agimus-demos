@@ -19,6 +19,7 @@ from agimus_demo_06_regrasp.async_subscriber import AsyncSubscriber
 from agimus_controller_ros.simple_trajectory_publisher import (
     SimpleTrajectoryPublisher,
 )
+
 # from agimus_demo_06_regrasp.trajectory_publisher import TrajectoryPublisher
 from agimus_demo_06_regrasp.utils import (
     normalize_quaternion,
@@ -86,6 +87,7 @@ def get_goal_box_pose(obj_id: str) -> list[float]:
         print("Grasping other stuff")
         return [0.0, 0.0, 0.15, 0.0, 0.0, 0.0, 1.0]
 
+
 def get_in_fer_link0_M_support_link():
     in_fer_link0_M_support_link = pin.SE3.Identity()
     in_fer_link0_M_support_link.translation = np.array([0.563, -0.165, -0.780])
@@ -94,14 +96,14 @@ def get_in_fer_link0_M_support_link():
     return in_fer_link0_M_support_link
 
 
-
 @dataclass
 class OrchestratorParams:
     """Orchestrator parameters."""
 
+    # TODO: update with the novel way (look on demo5)
     max_holding_force: float = 40.0
-    use_simulation: bool = True
-    use_hardcoded_poses: bool = True
+    use_simulation: bool = False
+    use_hardcoded_poses: bool = False
     use_smoothing_at_waypoints: bool = True
     ocp_horizon: int = 40
 
@@ -251,10 +253,7 @@ class Orchestrator(object):
         # TODO: change it to something normal
         # time.sleep(1.0)
 
-    def add_trajectory_to_publish(
-            self, 
-            path_vector, 
-            visual_servoing_time_range=None):
+    def add_trajectory_to_publish(self, path_vector, visual_servoing_time_range=None):
         q_array, dq_array, ddq_array = get_q_dq_ddq_arrays_from_path(
             path_vector, dt=self.trajectory_publisher.dt
         )
@@ -262,7 +261,7 @@ class Orchestrator(object):
         q_array += [q_array[-1]] * self.param.ocp_horizon  # OCP horizon
         dq_array += [dq_array[-1]] * self.param.ocp_horizon  # OCP horizon
         ddq_array += [ddq_array[-1]] * self.param.ocp_horizon  # OCP horizon
-        
+
         # # TODO: get this from OCP params somehow
         # traj += [
         #     traj[-1]
@@ -299,9 +298,7 @@ class Orchestrator(object):
             self.trajectory_publisher.params.trajectory_name
             == "generic_visual_servoing_trajectory"
         ):
-            in_support_link_M_object = pin.XYZQUATToSE3(
-                self.start_obj_pose.copy()
-            )
+            in_support_link_M_object = pin.XYZQUATToSE3(self.start_obj_pose.copy())
             in_fer_link0_M_object = (
                 get_in_fer_link0_M_support_link() * in_support_link_M_object
             )
@@ -333,7 +330,7 @@ class Orchestrator(object):
         # self.hpp_client = HPPInterface(
         #     object_name=object_name, use_spline_gradient_based_opt=False
         # )
-        self.start_obj_pose, rotated_90, rotate_180 = self.get_object_start_and_goal_pose(
+        self.start_obj_pose, _, rotate_180 = self.get_object_start_and_goal_pose(
             object_name=object_name, q=hpp_q_init, robot=self.planner.robot
         )
 
@@ -375,6 +372,6 @@ class Orchestrator(object):
                         self.trajectory_publisher.future_trajectory_done,
                     )
                     self.open_gripper()
-                
+
                 # This input provides some delay for robot to grasp
                 input("Continue to the next path?")
