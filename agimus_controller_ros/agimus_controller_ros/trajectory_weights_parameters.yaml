@@ -74,6 +74,10 @@ trajectory_weights_params:
       type: double_array
       default_value: [0.2]
       description: "Amplitude of the sinusoid."
+  visual_servoing_enabled:
+    type: bool
+    default_value: True
+    description: "Choose if the visual servoing mode is enabled or not"
   generic_trajectory_visual_servoing:
     w_increasing_max_rotation:
       type: double
