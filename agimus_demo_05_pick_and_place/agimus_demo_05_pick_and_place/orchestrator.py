@@ -86,7 +86,7 @@ def get_hardcoded_initial_object_pose(object_name: str) -> T.Tuple[str, list[flo
 def get_hardcoded_final_object_pose(object_name: str) -> list[float]:
     """Return desired object position in destination box frame."""
     if object_name in ["obj_01", "obj_02"]:  # lamp base
-        return "dest_box/base_link", [0.0, 0.0, 0.03, 0.0, 0.0, 0.0, 1.0]
+        return "dest_box/base_link", [0.0, 0.0, 0.05, 0.0, 0.0, 0.0, 1.0]
     elif object_name in [  # multisocket plugs
         "obj_19",
         "obj_20",
@@ -94,10 +94,11 @@ def get_hardcoded_final_object_pose(object_name: str) -> list[float]:
         "obj_22",
         "obj_23",
     ]:
-        return "dest_box/base_link", [0.4, -0.55, 0.075, 0.0, 0.0, 0.0, 1.0]
+        return "dest_box/base_link", [0.0, 0.0, 0.05, 0.0, 0.0, 0.0, 1.0]
+        # return "dest_box/base_link", [0.4, -0.55, 0.075, 0.0, 0.0, 0.0, 1.0]
         # return "dest_box/base_link", [0.1, 0.0, 0.03, 0.0, 0.0, 0.0, 1.0]
     elif object_name in ["obj_25", "obj_26"]:  # switches
-        return "dest_box/base_link", [0.05, 0.0, 0.03, 0.0, 0.0, 0.0, 1.0]
+        return "dest_box/base_link", [0.05, 0.0, 0.07, 0.0, 0.0, 0.0, 1.0]
     elif object_name == "obj_03":
         return "dest_box/base_link", [0.05, 0.0, 0.05, 0.0, 0.0, 0.0, 1.0]
     elif object_name == "obj_31":
@@ -118,7 +119,7 @@ def get_in_fer_link0_M_support_link():
 class OrchestratorParams:
     """Orchestrator parameters."""
 
-    max_holding_force: float = 30.0
+    max_holding_force: float = 50.0
     parking_configuration: npt.NDArray = np.zeros(0)
     destination_configuration: npt.NDArray = np.zeros(0)
 
@@ -130,8 +131,8 @@ class Orchestrator(object):
         self._node = Node("pick_and_place")
         self.param = OrchestratorParams()
 
-        self.source_bin_pose = [0.5, 0.3, 0.9, 0.0, 0.0, 0.0, 1.0]
-        self.destination_bin_pose = [-0.1, -0.1, 0.9, 0.0, 0.0, 0.0, 1.0]
+        self.source_bin_pose = [-0.22, 0.19, 0.9, 0.0, 0.0, 0.0, 1.0]
+        self.destination_bin_pose = [-0.22, -0.22, 0.9, 0.0, 0.0, 0.0, 1.0]
         self.min_opening_for_grasp = 0.01
 
         self.franka_gripper_cient = FrankaGripperClient(self._node)
@@ -271,11 +272,11 @@ class Orchestrator(object):
             0.03897743672132492,
         ]
 
-    def set_temporary_hpp_q_init(self, pose):
+    def set_temporary_hpp_q_init(self, pose, obj_pose):
         """Useful to get correct transformation between robot's frames."""
         q_tmp = (
             pose
-            + [0, 0, 1.0, 0, 0, 0, 1]
+            + obj_pose
             + self.hpp_client.default_obstacle_pose
             + self.hpp_client.default_obstacle2_pose
         )
@@ -341,7 +342,7 @@ class Orchestrator(object):
         )
         # TODO: get this from OCP params somehow
         horizon_size = 40
-        multiplier = 1
+        multiplier = 6
         # add complete horizon at the end of the trajectory of the last point
         q_array += [q_array[-1]] * multiplier * horizon_size  # OCP horizon
         dq_array += [dq_array[-1]] * multiplier * horizon_size  # OCP horizon
@@ -470,17 +471,22 @@ class Orchestrator(object):
                 start_obj_pose[1], q_init, start_obj_pose[0]
             )
             self.hpp_client.set_goal_obj_pose(goal_obj_pose[0], goal_obj_pose[1][:3])
+            start = time.perf_counter()
             grasp_path, placing_path, freefly_path = (
                 self.hpp_client.plan_pick_and_place(
                     q_init=list(current_robot_state.position),
                     # q_above_source_bin=self.q_above_source_bin,
                 )
             )
+            end = time.perf_counter()
+            elapsed = end - start
+            with open("timings" + object_name + ".txt", "a") as f:
+                f.write(f"{elapsed}\n")
 
             if enable_visualization_in_gepetto_gui:
                 # self.v = self.hpp_client.vf.createViewer()
                 self.hpp_client.v(self.hpp_client.q_init)
-                # input("Trajectory computed. Ready to move. Press Enter to start motion...")
+            input("Trajectory computed. Ready to move. Press Enter to start motion...")
 
             self.open_gripper()
             self.open_gripper()
@@ -508,6 +514,13 @@ class Orchestrator(object):
                 self.trajectory_publisher,
                 self.trajectory_publisher.future_trajectory_done,
             )
+            # Uncomment this to DEBUG if the robot arrives where it should!
+            # input("Free trajectory finished Press to capture robot q")
+            # current_robot_state = self.state_client.wait_for_future()
+            # current_robot_q = list(current_robot_state.position)
+            # self.set_temporary_hpp_q_init(current_robot_q, self.hpp_client.start_obj_pose)
+            # self.hpp_client.robot.setCurrentConfig(current_robot_q)
+            input("Free trajectory finished. Press Enter to grasp...")
             self.close_gripper()
             # time.sleep(0.5)
 

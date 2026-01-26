@@ -43,6 +43,7 @@ To place the source and destination box as it is in hpp, you may have first to c
 To start the demo :
 ```bash
 ros2 launch agimus_demo_05_pick_and_place bringup.launch.py arm_id:=fer vision_type:=apriltag_det robot_ip:=<fci-ip> use_ft_sensor:=false
+ros2 launch agimus_demo_05_pick_and_place bringup.launch.py arm_id:=fer vision_type:=happypose robot_ip:=<fci-ip> use_ft_sensor:=false
 ```
 
 ## tips
